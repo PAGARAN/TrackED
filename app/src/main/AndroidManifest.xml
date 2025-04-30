@@ -4,6 +4,8 @@
     package="com.example.tracked">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.USE_CREDENTIALS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
@@ -30,6 +32,7 @@
 
         <activity
             android:name=".DashboardActivity"
+            android:theme="@style/Theme.TrackED"
             android:exported="false" />
 
         <activity
@@ -44,6 +47,9 @@
 
     </application>
 </manifest>
+
+
+
 
 
 

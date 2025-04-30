@@ -15,14 +15,18 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.bumptech.glide.Glide;
 import com.example.tracked.api.WeatherApi;
@@ -55,15 +59,23 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import android.app.ProgressDialog;
+import com.google.api.services.tasks.model.Task;
+import com.example.tracked.api.TasksApiService;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.services.tasks.TasksScopes;
+import com.google.android.gms.common.api.Scope;
 
 public class DashboardActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "DashboardActivity";
-    private static final String WEATHER_API_KEY = "143810e7f766db7393b7d4cfc39f6321"; // Replace with a valid API key from OpenWeatherMap
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+    private static final int ADD_TASK_REQUEST_CODE = 1003;
+    private static final int REQUEST_AUTHORIZATION = 1002;
+    private static final int RC_SIGN_IN = 9001;
     
     private DrawerLayout drawerLayout;
     private TextView quoteText;
@@ -82,29 +94,32 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     private LocationRequest locationRequest;
     private FirebaseAuth mAuth;
     private GoogleSignInClient mGoogleSignInClient;
+    private TasksApiService tasksApiService;
+    private RecyclerView taskRecyclerView;
+    private TaskAdapter taskAdapter;
+    private boolean isActivityActive = false;
+    private RecyclerView tasksRecyclerView;
+    private TextView emptyTasksView;
+    private ImageButton menuButton;
 
     private void initializeLocation() {
-        // Initialize location request
         locationRequest = new LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
-            .setIntervalMillis(10000)  // 10 seconds
-            .setMinUpdateIntervalMillis(5000) // 5 seconds
+            .setIntervalMillis(300000)  // 5 minutes
+            .setMinUpdateIntervalMillis(180000) // 3 minutes
+            .setMaxUpdates(1) // Get only one update
             .build();
 
-        // Initialize location callback
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(LocationResult locationResult) {
-                if (locationResult == null) {
-                    Log.e(TAG, "Location result is null");
+                if (locationResult == null || locationResult.getLastLocation() == null) {
                     showWeatherError("Location not available");
                     return;
                 }
-                android.location.Location location = locationResult.getLastLocation();
-                if (location != null) {
-                    Log.d(TAG, "New location obtained: " + location.getLatitude() + ", " + location.getLongitude());
-                    fetchWeatherWithLocation(location);
-                    // Remove location updates after getting location
-                    fusedLocationClient.removeLocationUpdates(locationCallback);
+                fetchWeatherWithLocation(locationResult.getLastLocation());
+                // Remove location updates after getting the location
+                if (fusedLocationClient != null) {
+                    fusedLocationClient.removeLocationUpdates(this);
                 }
             }
         };
@@ -115,6 +130,17 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard);
 
+        // Initialize views first
+        drawerLayout = findViewById(R.id.drawer_layout);
+        tasksRecyclerView = findViewById(R.id.tasksRecyclerView);
+        emptyTasksView = findViewById(R.id.emptyTasksView);
+        menuButton = findViewById(R.id.menuButton);
+
+        // Set up RecyclerView
+        taskAdapter = new TaskAdapter();
+        tasksRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        tasksRecyclerView.setAdapter(taskAdapter);
+
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
@@ -122,9 +148,49 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
+                .requestScopes(new Scope(TasksScopes.TASKS))
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+
+        // Set up navigation drawer
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(this);
+
+        // Set up menu button
+        menuButton.setOnClickListener(v -> {
+            if (drawerLayout != null) {
+                if (!drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.openDrawer(GravityCompat.START);
+                }
+            }
+        });
+
+        // Set up FAB
+        FloatingActionButton fabAdd = findViewById(R.id.fabAdd);
+        if (fabAdd != null) {
+            fabAdd.setOnClickListener(v -> {
+                Intent intent = new Intent(DashboardActivity.this, AddTaskActivity.class);
+                startActivityForResult(intent, ADD_TASK_REQUEST_CODE);
+            });
+        }
+
+        // Initialize user info
+        if (mAuth.getCurrentUser() != null) {
+            String userEmail = mAuth.getCurrentUser().getEmail();
+            TextView userEmailView = findViewById(R.id.userEmail);
+            if (userEmailView != null) {
+                userEmailView.setText(userEmail);
+            }
+            initializeTasksApiService(userEmail);
+        }
+
+        // Set up toolbar
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
 
         // Add back button handling
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -182,19 +248,6 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         zenQuotesApi = quoteRetrofit.create(ZenQuotesApi.class);
         weatherApi = weatherRetrofit.create(WeatherApi.class);
 
-        // Set up the drawer layout
-        drawerLayout = findViewById(R.id.drawer_layout);
-        NavigationView navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
-
-        // Set up menu button
-        ImageButton menuButton = findViewById(R.id.menuButton);
-        menuButton.setOnClickListener(v -> {
-            if (!drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                drawerLayout.openDrawer(GravityCompat.START);
-            }
-        });
-
         // Initialize the overlay
         addTaskOverlay = getLayoutInflater().inflate(R.layout.overlay_add_task, null);
         ((ViewGroup) findViewById(android.R.id.content)).addView(addTaskOverlay);
@@ -202,13 +255,6 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
 
         // Setup task type dropdown
         setupTaskTypeDropdown();
-
-        // Set up FAB
-        FloatingActionButton fabAdd = findViewById(R.id.fabAdd);
-        fabAdd.setOnClickListener(v -> {
-            Intent intent = new Intent(DashboardActivity.this, AddTaskActivity.class);
-            startActivity(intent);
-        });
 
         // Set up close button
         ImageButton closeButton = addTaskOverlay.findViewById(R.id.closeOverlayButton);
@@ -222,33 +268,15 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             
             String title = titleInput.getText().toString();
             String description = descriptionInput.getText().toString();
-            
+
+
             if (!title.isEmpty()) {
                 // Add your task creation logic here
                 hideAddTaskOverlay();
-                // Clear inputs
-                titleInput.setText("");
-                descriptionInput.setText("");
-            } else {
-                titleInput.setError("Title is required");
             }
         });
 
-        // Set up date picker
-        MaterialButton datePickerButton = addTaskOverlay.findViewById(R.id.datePickerButton);
-        datePickerButton.setOnClickListener(v -> {
-            // Show date picker dialog
-            // Add your date picker logic here
-        });
-
-        // Set up priority button
-        MaterialButton priorityButton = addTaskOverlay.findViewById(R.id.priorityButton);
-        priorityButton.setOnClickListener(v -> {
-            // Show priority selection dialog
-            // Add your priority selection logic here
-        });
-
-        // Initialize other UI components and fetch data
+        // Start fetching data
         fetchQuote();
         checkLocationPermissionAndFetchWeather();
     }
@@ -325,106 +353,163 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         });
     }
 
-    private void checkLocationPermissionAndFetchWeather() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Location permission not granted, requesting permission");
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    LOCATION_PERMISSION_REQUEST_CODE);
+    private void requestLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+            != PackageManager.PERMISSION_GRANTED) {
+            
+            // Show a dialog explaining why we need location permission
+            new MaterialAlertDialogBuilder(this)
+                .setTitle("Location Permission Required")
+                .setMessage("This app needs location permission to show weather information for your area. Please grant location permission to continue.")
+                .setPositiveButton("Grant Permission", (dialog, which) -> {
+                    ActivityCompat.requestPermissions(this, 
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 
+                        LOCATION_PERMISSION_REQUEST_CODE);
+                })
+                .setNegativeButton("Not Now", (dialog, which) -> {
+                    showWeatherError("Weather information requires location permission");
+                })
+                .setCancelable(false)
+                .show();
         } else {
-            Log.d(TAG, "Location permission already granted, requesting location updates");
+            // Permission already granted, proceed with location updates
             requestLocationUpdates();
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Location permission granted");
+                requestLocationUpdates();
+            } else {
+                Log.e(TAG, "Location permission denied");
+                showWeatherError("Please enable location permission in Settings to see weather information");
+                // Show a dialog with instructions to enable permission in settings
+                new MaterialAlertDialogBuilder(this)
+                    .setTitle("Location Permission Required")
+                    .setMessage("To see weather information, please enable location permission in Settings.")
+                    .setPositiveButton("Open Settings", (dialog, which) -> {
+                        Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Not Now", null)
+                    .show();
+            }
+        }
+    }
+
+    private void checkLocationPermissionAndFetchWeather() {
+        requestLocationPermission();
     }
 
     private void requestLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "Location permission not granted in requestLocationUpdates");
+            showWeatherError("Location permission required");
+            // Show a dialog explaining why we need location permission
+            new MaterialAlertDialogBuilder(this)
+                .setTitle("Location Permission Required")
+                .setMessage("This app needs location permission to show weather information for your area. Please grant location permission to continue.")
+                .setPositiveButton("Grant Permission", (dialog, which) -> {
+                    ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        LOCATION_PERMISSION_REQUEST_CODE);
+                })
+                .setNegativeButton("Not Now", (dialog, which) -> {
+                    showWeatherError("Weather information requires location permission");
+                })
+                .setCancelable(false)
+                .show();
             return;
         }
 
         Log.d(TAG, "Starting location request");
         // First try to get last known location
-        fusedLocationClient.getLastLocation()
-            .addOnSuccessListener(this, location -> {
-                if (location != null) {
-                    Log.d(TAG, "Last known location obtained: " + location.getLatitude() + ", " + location.getLongitude());
-                    fetchWeatherWithLocation(location);
-                } else {
-                    Log.d(TAG, "Last location null, requesting updates");
-                    // If last known location is null, request location updates
-                    try {
-                        fusedLocationClient.requestLocationUpdates(locationRequest,
-                                locationCallback,
-                                Looper.getMainLooper())
-                                .addOnSuccessListener(unused -> Log.d(TAG, "Location updates request successful"))
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Location updates request failed", e);
-                                    showWeatherError("Location service error");
-                                });
-                    } catch (SecurityException e) {
-                        Log.e(TAG, "Security exception when requesting location updates", e);
-                        showWeatherError("Location permission error");
+        try {
+            fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, location -> {
+                    if (location != null) {
+                        Log.d(TAG, "Last known location obtained: " + location.getLatitude() + ", " + location.getLongitude());
+                        fetchWeatherWithLocation(location);
+                    } else {
+                        Log.d(TAG, "Last location null, requesting updates");
+                        // If last known location is null, request location updates
+                        try {
+                            fusedLocationClient.requestLocationUpdates(locationRequest,
+                                    locationCallback,
+                                    Looper.getMainLooper())
+                                    .addOnSuccessListener(unused -> Log.d(TAG, "Location updates request successful"))
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Location updates request failed", e);
+                                        showWeatherError("Location service error. Please try again later.");
+                                    });
+                        } catch (SecurityException e) {
+                            Log.e(TAG, "Security exception when requesting location updates", e);
+                            showWeatherError("Location permission error. Please grant location permission in Settings.");
+                            // Show a dialog with instructions to enable permission in settings
+                            new MaterialAlertDialogBuilder(this)
+                                .setTitle("Location Permission Required")
+                                .setMessage("To see weather information, please enable location permission in Settings.")
+                                .setPositiveButton("Open Settings", (dialog, which) -> {
+                                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                                    startActivity(intent);
+                                })
+                                .setNegativeButton("Not Now", null)
+                                .show();
+                        }
                     }
-                }
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "Error getting last location", e);
-                showWeatherError("Failed to get location");
-            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error getting last location", e);
+                    showWeatherError("Failed to get location. Please try again later.");
+                });
+        } catch (SecurityException e) {
+            Log.e(TAG, "Security exception when getting last location", e);
+            showWeatherError("Location permission error. Please grant location permission in Settings.");
+            // Show a dialog with instructions to enable permission in settings
+            new MaterialAlertDialogBuilder(this)
+                .setTitle("Location Permission Required")
+                .setMessage("To see weather information, please enable location permission in Settings.")
+                .setPositiveButton("Open Settings", (dialog, which) -> {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                })
+                .setNegativeButton("Not Now", null)
+                .show();
+        }
     }
 
     private void fetchWeatherWithLocation(android.location.Location location) {
-        weatherProgress.setVisibility(View.VISIBLE);
-        weatherIcon.setVisibility(View.GONE);
-        temperatureText.setVisibility(View.GONE);
-        weatherDescription.setVisibility(View.GONE);
+        if (!isActivityActive) return;
 
-        Log.d(TAG, "Fetching weather for location: " + location.getLatitude() + ", " + location.getLongitude());
-
-        Call<Weather> call = weatherApi.getCurrentWeather(
+        String apiKey = getString(R.string.weather_api_key);
+        weatherApi.getCurrentWeather(
             location.getLatitude(),
             location.getLongitude(),
-            WEATHER_API_KEY,
+            apiKey,
             "metric"
-        );
-
-        Log.d(TAG, "Weather API request URL: " + call.request().url());
-
-        call.enqueue(new Callback<Weather>() {
+        ).enqueue(new Callback<Weather>() {
             @Override
             public void onResponse(Call<Weather> call, Response<Weather> response) {
-                Log.d(TAG, "Weather API response code: " + response.code());
-                
-                if (!response.isSuccessful()) {
-                    try {
-                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error body";
-                        Log.e(TAG, "Weather API error response: " + errorBody);
-                    } catch (IOException e) {
-                        Log.e(TAG, "Error reading error body", e);
-                    }
-                }
-
-                weatherProgress.setVisibility(View.GONE);
-                weatherIcon.setVisibility(View.VISIBLE);
-                temperatureText.setVisibility(View.VISIBLE);
-                weatherDescription.setVisibility(View.VISIBLE);
+                if (!isActivityActive) return;
 
                 if (response.isSuccessful() && response.body() != null) {
-                    Weather weather = response.body();
-                    Log.d(TAG, "Weather data received: " + weather.getMain().getTemperature() + "°C");
-                    updateWeatherUI(weather);
+                    updateWeatherUI(response.body());
                 } else {
-                    showWeatherError("Unable to fetch weather data");
+                    showWeatherError("Failed to get weather data");
                 }
             }
 
             @Override
             public void onFailure(Call<Weather> call, Throwable t) {
-                Log.e(TAG, "Weather API call failed", t);
-                weatherProgress.setVisibility(View.GONE);
+                if (!isActivityActive) return;
                 showWeatherError("Network error: " + t.getMessage());
             }
         });
@@ -440,6 +525,9 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                       "°C, description: " + description + 
                       ", icon: " + iconCode);
 
+            // Hide loading animation
+            weatherProgress.setVisibility(View.GONE);
+            
             temperatureText.setText(String.format(Locale.getDefault(), "%.1f°C", temperature));
             weatherDescription.setText(description);
             
@@ -468,22 +556,18 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Location permission granted");
-                requestLocationUpdates();
-            } else {
-                Log.e(TAG, "Location permission denied");
-                showWeatherError("Location permission required");
-            }
+    protected void onResume() {
+        super.onResume();
+        isActivityActive = true;
+        if (tasksApiService != null) {
+            loadTasks();
         }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        isActivityActive = false;
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
@@ -503,8 +587,6 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             // Handle news action
         } else if (id == R.id.nav_profile) {
             // Handle profile action
-        } else if (id == R.id.nav_settings) {
-            // Handle settings action
         } else if (id == R.id.nav_logout) {
             signOut();
         }
@@ -544,19 +626,158 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                 .setNegativeButton("No", null)
                 .show();
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == ADD_TASK_REQUEST_CODE && resultCode == RESULT_OK) {
+            // Refresh task list when a new task is added
+            loadTasks();
+        }
+        if (requestCode == REQUEST_AUTHORIZATION) {
+            if (resultCode == RESULT_OK) {
+                // Retry fetching tasks after authorization
+                loadTasks();
+            } else {
+                Toast.makeText(this, "Authorization required to access tasks", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void loadTasks() {
+        if (tasksApiService == null) {
+            Log.e(TAG, "TasksApiService is null");
+            return;
+        }
+
+        tasksApiService.getTasks(new TasksApiService.TaskListCallback() {
+            @Override
+            public void onSuccess(List<Task> tasks) {
+                if (!isActivityActive) return;
+                
+                runOnUiThread(() -> {
+                    if (tasks.isEmpty()) {
+                        emptyTasksView.setVisibility(View.VISIBLE);
+                        tasksRecyclerView.setVisibility(View.GONE);
+                    } else {
+                        emptyTasksView.setVisibility(View.GONE);
+                        tasksRecyclerView.setVisibility(View.VISIBLE);
+                        taskAdapter.setTasks(tasks);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                if (!isActivityActive) return;
+                
+                runOnUiThread(() -> {
+                    Log.e(TAG, "Error loading tasks", e);
+                    Toast.makeText(DashboardActivity.this, 
+                        "Error loading tasks: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (tasksApiService != null) {
+            tasksApiService.shutdown();
+        }
+        // Clean up resources
+        if (fusedLocationClient != null && locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
+        // Clear references
+        weatherApi = null;
+        zenQuotesApi = null;
+        taskAdapter = null;
+        locationCallback = null;
+    }
+
+    private void checkTasksApiAccess() {
+        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+        if (account != null && account.getGrantedScopes().contains(new Scope(TasksScopes.TASKS))) {
+            // We have proper access
+            initializeTasksApiService(account.getEmail());
+        } else {
+            // Need to request access
+            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestEmail()
+                    .requestScopes(new Scope(TasksScopes.TASKS))
+                    .build();
+            GoogleSignInClient signInClient = GoogleSignIn.getClient(this, gso);
+            startActivityForResult(signInClient.getSignInIntent(), REQUEST_AUTHORIZATION);
+        }
+    }
+
+    private void testTasksApi() {
+        if (tasksApiService != null) {
+            Log.d(TAG, "Testing Tasks API connection...");
+            tasksApiService.getTasks(new TasksApiService.TaskListCallback() {
+                @Override
+                public void onSuccess(List<Task> tasks) {
+                    Log.d(TAG, "Successfully retrieved " + tasks.size() + " tasks");
+                    runOnUiThread(() -> Toast.makeText(DashboardActivity.this, 
+                        "Successfully retrieved " + tasks.size() + " tasks", 
+                        Toast.LENGTH_SHORT).show());
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    Log.e(TAG, "Failed to retrieve tasks", e);
+                    runOnUiThread(() -> Toast.makeText(DashboardActivity.this,
+                        "Error: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show());
+                }
+            });
+        } else {
+            Log.e(TAG, "TasksApiService is null");
+        }
+    }
+
+    private void initializeTasksApiService(String email) {
+        try {
+            tasksApiService = new TasksApiService(this, email);
+            testTasksConnection();
+            loadTasks();
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing TasksApiService", e);
+            Toast.makeText(this, "Error initializing tasks service: " + e.getMessage(), 
+                          Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void testTasksConnection() {
+        if (tasksApiService != null) {
+            Log.d(TAG, "Testing Tasks API connection...");
+            tasksApiService.getTasks(new TasksApiService.TaskListCallback() {
+                @Override
+                public void onSuccess(List<Task> tasks) {
+                    runOnUiThread(() -> {
+                        String message = "Successfully connected to Tasks API. Found " + tasks.size() + " tasks.";
+                        Log.d(TAG, message);
+                        Toast.makeText(DashboardActivity.this, message, Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    runOnUiThread(() -> {
+                        String error = "Tasks API Error: " + e.getMessage();
+                        Log.e(TAG, error, e);
+                        Toast.makeText(DashboardActivity.this, error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        } else {
+            Log.e(TAG, "TasksApiService is not initialized");
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

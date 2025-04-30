@@ -47,11 +47,48 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <!-- Task Name Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_task"
+                        android:contentDescription="Task name" />
+
+                    <EditText
+                        android:id="@+id/taskNameInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="16dp"
+                        android:background="@null"
+                        android:hint="Task Name"
+                        android:inputType="text"
+                        android:textSize="16sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Task Type Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/taskTypeCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -67,61 +104,68 @@
                         android:contentDescription="Task type" />
 
                     <TextView
+                        android:id="@+id/taskTypeText"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="16dp"
-                        android:text="Home Work"
+                        android:text="Choose Task Type"
                         android:textSize="16sp" />
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_dropdown"
-                        android:contentDescription="Dropdown" />
+                        android:contentDescription="Select task type" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Description Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardElevation="0dp">
 
-                <EditText
-                    android:id="@+id/taskNameInput"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@null"
-                    android:hint="Task Name"
-                    android:padding="16dp"
-                    android:textSize="16sp" />
+                    android:layout_height="141dp"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="top"
+                        android:layout_marginTop="4dp"
+                        android:contentDescription="Description"
+                        android:src="@drawable/ic_description" />
+
+                    <EditText
+                        android:id="@+id/descriptionInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:gravity="top"
+                        android:hint="Description"
+                        android:inputType="textMultiLine"
+                        android:minLines="3"
+                        android:textSize="16sp" />
+                </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Start Date Card -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/startDateCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="0dp">
-
-                <EditText
-                    android:id="@+id/descriptionInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="120dp"
-                    android:background="@null"
-                    android:gravity="top"
-                    android:hint="Description/note"
-                    android:padding="16dp"
-                    android:textSize="16sp" />
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -142,7 +186,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="16dp"
-                        android:text="April 23, 2025"
+                        android:text="Select Start Date"
                         android:textSize="16sp" />
 
                     <ImageView
@@ -153,11 +197,14 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Due Date Card -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/dueDateCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -170,15 +217,15 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_calendar"
-                        android:contentDescription="End date" />
+                        android:contentDescription="Due date" />
 
                     <TextView
-                        android:id="@+id/endDateText"
+                        android:id="@+id/dueDateText"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="16dp"
-                        android:text="April 25, 2025"
+                        android:text="Select Due Date"
                         android:textSize="16sp" />
 
                     <ImageView
@@ -191,5 +238,17 @@
 
         </LinearLayout>
     </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/addTaskButton"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_margin="16dp"
+        android:text="Add Task"
+        android:textSize="16sp"
+        app:backgroundTint="@color/blue_500"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout> 

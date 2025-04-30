@@ -6,7 +6,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-import android.util.TypedValue;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -16,10 +15,12 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.api.services.tasks.TasksScopes;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
@@ -38,10 +39,11 @@ public class LoginActivity extends AppCompatActivity {
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
-        // Configure Google Sign In
+        // Configure Google Sign In with Tasks API scope
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
+                .requestScopes(new Scope(TasksScopes.TASKS))
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
@@ -96,6 +98,13 @@ public class LoginActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.GONE);
                 googleSignInContainer.setEnabled(true);
                 String errorMessage = "Google Sign In failed: " + e.getStatusCode();
+                if (e.getStatusCode() == 7) {
+                    errorMessage = "Network error. Please check your internet connection.";
+                } else if (e.getStatusCode() == 10) {
+                    errorMessage = "Developer error. Please contact support.";
+                } else if (e.getStatusCode() == 12) {
+                    errorMessage = "Sign in currently in progress. Please try again.";
+                }
                 Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         }
@@ -105,6 +114,8 @@ public class LoginActivity extends AppCompatActivity {
         if (idToken == null) {
             Log.e(TAG, "ID Token is null");
             Toast.makeText(this, "Authentication failed: No ID token", Toast.LENGTH_SHORT).show();
+            progressBar.setVisibility(View.GONE);
+            googleSignInContainer.setEnabled(true);
             return;
         }
 
@@ -142,6 +153,12 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 }
+
+
+
+
+
+
 
 
 
