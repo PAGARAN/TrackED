@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="task_card_margin">5dp</dimen>
+    <dimen name="task_spacing">16dp</dimen>
+    <dimen name="dialog_padding">16dp</dimen>
+</resources>

@@ -4,15 +4,14 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F8FA">
+    android:background="#E6F7FF">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@android:color/white"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:layout_editor_absoluteX="105dp">
+        app:layout_constraintTop_toTopOf="parent">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -29,9 +28,19 @@
             android:text="Add task"
             android:textColor="@android:color/black"
             android:textSize="20sp"
-            android:layout_gravity="center"
-            android:layout_marginStart="0dp" />
+            android:layout_gravity="center" />
 
+        <ImageButton
+            android:id="@+id/saveButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Save"
+            android:padding="8dp"
+            android:src="@drawable/ic_task"
+            android:tint="#03A9F4" />
     </androidx.appcompat.widget.Toolbar>
 
     <ScrollView
@@ -47,40 +56,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Task Name Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardElevation="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_task"
-                        android:contentDescription="Task name" />
-
-                    <EditText
-                        android:id="@+id/taskNameInput"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="16dp"
-                        android:background="@null"
-                        android:hint="Task Name"
-                        android:inputType="text"
-                        android:textSize="16sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
             <!-- Task Type Card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/taskTypeCard"
@@ -94,29 +69,79 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:orientation="vertical"
                     android:padding="16dp">
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_task_type"
-                        android:contentDescription="Task type" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Task type"
+                        android:textColor="#757575"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="4dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_task_type"
+                            android:tint="#03A9F4"
+                            android:contentDescription="Task type" />
+
+                        <TextView
+                            android:id="@+id/taskTypeText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
+                            android:text="Home Work"
+                            android:textColor="@android:color/black"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_dropdown"
+                            android:contentDescription="Select task type" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Task Name Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:id="@+id/taskTypeText"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="16dp"
-                        android:text="Choose Task Type"
-                        android:textSize="16sp" />
+                        android:text="Task Name"
+                        android:textColor="#757575"
+                        android:textSize="12sp" />
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_dropdown"
-                        android:contentDescription="Select task type" />
+                    <EditText
+                        android:id="@+id/taskNameInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="@null"
+                        android:hint="Enter task name"
+                        android:inputType="text"
+                        android:textSize="16sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -131,27 +156,25 @@
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="141dp"
-                    android:orientation="horizontal"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:padding="16dp">
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="top"
-                        android:layout_marginTop="4dp"
-                        android:contentDescription="Description"
-                        android:src="@drawable/ic_description" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Description/note"
+                        android:textColor="#757575"
+                        android:textSize="12sp" />
 
                     <EditText
                         android:id="@+id/descriptionInput"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:layout_weight="1"
+                        android:layout_marginTop="4dp"
                         android:background="@null"
                         android:gravity="top"
-                        android:hint="Description"
+                        android:hint="Enter description"
                         android:inputType="textMultiLine"
                         android:minLines="3"
                         android:textSize="16sp" />
@@ -171,29 +194,45 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:orientation="vertical"
                     android:padding="16dp">
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_calendar"
-                        android:contentDescription="Start date" />
-
                     <TextView
-                        android:id="@+id/startDateText"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="16dp"
-                        android:text="Select Start Date"
-                        android:textSize="16sp" />
+                        android:text="Start date"
+                        android:textColor="#757575"
+                        android:textSize="12sp" />
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_dropdown"
-                        android:contentDescription="Select date" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="4dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_calendar"
+                            android:tint="#03A9F4"
+                            android:contentDescription="Start date" />
+
+                        <TextView
+                            android:id="@+id/startDateText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
+                            android:text="Select Start Date"
+                            android:textColor="@android:color/black"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_dropdown"
+                            android:contentDescription="Select date" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -210,32 +249,47 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:orientation="vertical"
                     android:padding="16dp">
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_calendar"
-                        android:contentDescription="Due date" />
-
                     <TextView
-                        android:id="@+id/dueDateText"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="16dp"
-                        android:text="Select Due Date"
-                        android:textSize="16sp" />
+                        android:text="End date"
+                        android:textColor="#757575"
+                        android:textSize="12sp" />
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_dropdown"
-                        android:contentDescription="Select date" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="4dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_calendar"
+                            android:tint="#03A9F4"
+                            android:contentDescription="Due date" />
+
+                        <TextView
+                            android:id="@+id/dueDateText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
+                            android:text="Select Due Date"
+                            android:textColor="@android:color/black"
+                            android:textSize="16sp" />
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_dropdown"
+                            android:contentDescription="Select date" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
         </LinearLayout>
     </ScrollView>
 

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:fitsSystemWindows="true">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="#FFFFFF"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/menuButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_menu"
+            app:tint="@android:color/black"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="Task list"
+            android:textColor="@android:color/black"
+            android:textSize="20sp"
+            android:textStyle="bold"/>
+            
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="24dp"
+            android:src="@drawable/tracked_logo"/>
+    </LinearLayout>
+
+    <!-- Task Filter Tabs -->
+    <LinearLayout
+        android:id="@+id/taskFilterContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="#FFFFFF"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Completed Tab -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/completedTab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            app:cardCornerRadius="20dp"
+            app:cardBackgroundColor="#333333"
+            app:cardElevation="1dp">
+
+            <TextView
+                android:id="@+id/completedTabText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="COMPLETED 02"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:padding="8dp"/>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- To Do Tab -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/todoTab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            app:cardCornerRadius="20dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardElevation="1dp">
+
+            <TextView
+                android:id="@+id/todoTabText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="TO DO 08"
+                android:textColor="#333333"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:padding="8dp"/>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Archive Tab -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/archiveTab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            app:cardCornerRadius="20dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardElevation="1dp">
+
+            <TextView
+                android:id="@+id/archiveTabText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ARCHIVE 01"
+                android:textColor="#333333"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:padding="8dp"/>
+        </com.google.android.material.card.MaterialCardView>
+        
+        <!-- More Options Button -->
+        <ImageButton
+            android:id="@+id/moreOptionsButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_more_vert"
+            app:tint="@android:color/black"/>
+    </LinearLayout>
+
+    <!-- Task List RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/taskListRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:padding="16dp"
+        android:clipToPadding="false"
+        android:background="#FFFFFF"
+        app:layout_constraintTop_toBottomOf="@id/taskFilterContainer"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- FAB for adding new tasks -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAddTask"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_add"
+        app:tint="#FFFFFF"
+        app:backgroundTint="#2196F3"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
+
+

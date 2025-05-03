@@ -71,16 +71,19 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(View.VISIBLE);
         googleSignInContainer.setEnabled(false);
 
-        try {
-            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-            startActivityForResult(signInIntent, RC_SIGN_IN);
-        } catch (Exception e) {
-            Log.e(TAG, "Error creating sign in intent", e);
-            Toast.makeText(this, "Error starting sign in: " + e.getMessage(), 
-                         Toast.LENGTH_SHORT).show();
-            progressBar.setVisibility(View.GONE);
-            googleSignInContainer.setEnabled(true);
-        }
+        // Clear any existing sign-in state
+        mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
+            try {
+                Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                startActivityForResult(signInIntent, RC_SIGN_IN);
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating sign in intent", e);
+                Toast.makeText(this, "Error starting sign in: " + e.getMessage(), 
+                             Toast.LENGTH_SHORT).show();
+                progressBar.setVisibility(View.GONE);
+                googleSignInContainer.setEnabled(true);
+            }
+        });
     }
 
     @Override

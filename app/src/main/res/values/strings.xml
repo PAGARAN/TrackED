@@ -6,6 +6,8 @@
     <string name="google_tasks_client_id">928561659771-em91i0svk4bnfg8feqqu7onf37f2eihn.apps.googleusercontent.com</string>
     <string name="weather_api_key">143810e7f766db7393b7d4cfc39f6321</string>
     <string name="default_web_client_id">928561659771-em91i0svk4bnfg8feqqu7onf37f2eihn.apps.googleusercontent.com</string>
+    <string name="news_api_key">89286b01610042caac9e1578fcff7ac1</string>
 </resources>
+
 
 

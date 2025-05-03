@@ -43,10 +43,12 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         if (dueDate != null) {
             try {
                 Date date = apiFormat.parse(dueDate);
-                holder.dueDateView.setText("Due: " + displayFormat.format(date));
+                holder.dueDateView.setText(displayFormat.format(date));
             } catch (ParseException e) {
-                holder.dueDateView.setText("Due: " + dueDate);
+                holder.dueDateView.setText(dueDate);
             }
+        } else {
+            holder.dueDateView.setText("");
         }
     }
 

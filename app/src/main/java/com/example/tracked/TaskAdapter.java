@@ -9,9 +9,26 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.api.services.tasks.model.Task;
 import java.util.ArrayList;
 import java.util.List;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;    
+// Remove the TabLayout import
+// import com.google.android.material.tabs.TabLayout;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
     private List<Task> tasks = new ArrayList<>();
+    private int layoutResId;
+    
+    // Default constructor uses the detailed layout
+    public TaskAdapter() {
+        this.layoutResId = R.layout.item_task;
+    }
+    
+    // Constructor with layout resource ID
+    public TaskAdapter(int layoutResId) {
+        this.layoutResId = layoutResId;
+    }
 
     public void setTasks(List<Task> tasks) {
         this.tasks = tasks;
@@ -22,14 +39,13 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     @Override
     public TaskViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-            .inflate(R.layout.item_task, parent, false);
+                .inflate(layoutResId, parent, false);
         return new TaskViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
-        Task task = tasks.get(position);
-        holder.bind(task);
+        holder.bind(tasks.get(position));
     }
 
     @Override
@@ -37,22 +53,34 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         return tasks.size();
     }
 
-    static class TaskViewHolder extends RecyclerView.ViewHolder {
-        private final TextView titleText;
-        private final TextView descriptionText;
-        private final TextView dueDateText;
+    class TaskViewHolder extends RecyclerView.ViewHolder {
+        TextView titleView;
+        TextView descriptionView;
+        TextView dueDateView;
 
         TaskViewHolder(View itemView) {
             super(itemView);
-            titleText = itemView.findViewById(R.id.taskTitle);
-            descriptionText = itemView.findViewById(R.id.taskDescription);
-            dueDateText = itemView.findViewById(R.id.taskDueDate);
+            titleView = itemView.findViewById(R.id.taskTitle);
+            
+            // These views might not exist in the overview layout
+            descriptionView = itemView.findViewById(R.id.taskDescription);
+            dueDateView = itemView.findViewById(R.id.taskDueDate);
         }
 
         void bind(Task task) {
-            titleText.setText(task.getTitle());
-            descriptionText.setText(task.getNotes());
-            dueDateText.setText(task.getDue());
+            titleView.setText(task.getTitle());
+            
+            if (descriptionView != null) {
+                // Use getNotes() instead of getDescription()
+                descriptionView.setText(task.getNotes());
+            }
+            
+            if (dueDateView != null && task.getDue() != null) {
+                dueDateView.setText(task.getDue());
+            }
         }
     }
 }
+
+
+
