@@ -90,7 +90,11 @@ public class NewsFragment extends Fragment {
         LinearLayoutManager newsLayoutManager = new LinearLayoutManager(getContext(),
                 LinearLayoutManager.VERTICAL, false);
         newsRecyclerView.setLayoutManager(newsLayoutManager);
-        
+
+        // Add PagerSnapHelper to snap to full items
+        PagerSnapHelper snapHelper = new PagerSnapHelper();
+        snapHelper.attachToRecyclerView(newsRecyclerView);
+
         // Initialize adapter
         newsAdapter = new NewsAdapter(getContext());
         newsRecyclerView.setAdapter(newsAdapter);
@@ -322,5 +326,8 @@ public class NewsFragment extends Fragment {
         });
     }
 }
+
+
+
 
 

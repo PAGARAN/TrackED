@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -13,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -24,19 +26,39 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.recyclerview.widget.RecyclerView;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.example.tracked.api.NewsApi;
+import com.example.tracked.api.RssFeedService;
 import com.example.tracked.api.WeatherApi;
 import com.example.tracked.api.ZenQuotesApi;
+import com.example.tracked.model.NewsArticle;
+import com.example.tracked.model.NewsResponse;
 import com.example.tracked.model.Quote;
 import com.example.tracked.model.Weather;
+import com.example.tracked.adapters.NewsAdapter;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.navigation.NavigationView;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import android.graphics.Rect;
+import android.net.Uri;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationRequest;
@@ -44,9 +66,55 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.Priority;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.tabs.TabLayout;
+import com.google.api.services.tasks.model.Task;
+import com.example.tracked.api.TasksApiService;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.services.tasks.TasksScopes;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.material.tabs.TabLayout;
+import android.graphics.Rect;
+import android.net.Uri;
+import com.example.tracked.api.NewsApi;
+import com.example.tracked.model.NewsArticle;
+import com.example.tracked.model.NewsResponse;
+import com.example.tracked.adapters.NewsAdapter;
+import com.example.tracked.api.RssFeedService;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import android.app.ProgressDialog;
+import com.google.api.services.tasks.model.Task;
+import com.example.tracked.api.TasksApiService;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.services.tasks.TasksScopes;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.material.tabs.TabLayout;
+import android.graphics.Rect;
+import android.net.Uri;
+import com.example.tracked.api.NewsApi;
+import com.example.tracked.model.NewsArticle;
+import com.example.tracked.model.NewsResponse;
+import com.example.tracked.adapters.NewsAdapter;
+import com.example.tracked.api.RssFeedService;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -89,45 +157,51 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     private static final int ADD_TASK_REQUEST_CODE = 1003;
     private static final int REQUEST_AUTHORIZATION = 1002;
     private static final int RC_SIGN_IN = 9001;
+    private static final int AUTO_SCROLL_DELAY = 5000; // 5 seconds
 
     private DrawerLayout drawerLayout;
-    private TextView quoteText;
-    private TextView quoteAuthor;
-    private ProgressBar quoteProgress;
-    private ZenQuotesApi zenQuotesApi;
-    private View addTaskOverlay;
-    private boolean isOverlayVisible = false;
-    private WeatherApi weatherApi;
-    private ProgressBar weatherProgress;
-    private ImageView weatherIcon;
-    private TextView temperatureText;
-    private TextView weatherDescription;
-    private FusedLocationProviderClient fusedLocationClient;
-    private LocationCallback locationCallback;
-    private LocationRequest locationRequest;
-    private FirebaseAuth mAuth;
-    private GoogleSignInClient mGoogleSignInClient;
-    private TasksApiService tasksApiService;
-    private RecyclerView taskRecyclerView;
-    private TaskAdapter taskAdapter;
-    private boolean isActivityActive = false;
     private RecyclerView tasksRecyclerView;
     private TextView emptyTasksView;
     private ImageButton menuButton;
-    // TabLayout field declaration removed
+    private FirebaseAuth mAuth;
+    private GoogleSignInClient mGoogleSignInClient;
+    private TasksApiService tasksApiService;
+    private TaskAdapter taskAdapter;
+    private View addTaskOverlay;
+    private boolean isActivityActive = false;
+    private boolean isOverlayVisible = false;
 
-    // Add these new field declarations
-    private ImageView newsImage;
-    private TextView newsTitle;
-    private TextView newsDescription;
-    private ProgressBar newsProgress;
-    private NewsApi newsApi;
+    // News related fields
     private RecyclerView newsRecyclerView;
+    private ProgressBar newsProgress;
     private NewsAdapter newsAdapter;
-    private Handler autoScrollHandler;
-    private Runnable autoScrollRunnable;
-    private final int AUTO_SCROLL_DELAY = 5000; // 5 seconds between scrolls
+    private NewsApi newsApi;
     private RssFeedService rssFeedService;
+    private Handler autoScrollHandler = new Handler();
+    private int currentNewsPosition = 0;
+
+    // Weather related fields
+    private TextView temperatureText;
+    private TextView weatherDescription;
+    private ImageView weatherIcon;
+    private ProgressBar weatherProgress;
+
+    // Quote related fields
+    private TextView quoteText;
+    private TextView quoteAuthor;
+    private ProgressBar quoteProgress;
+
+    // Location related fields
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationRequest locationRequest;
+    private LocationCallback locationCallback;
+
+    // API related fields
+    private ZenQuotesApi zenQuotesApi;
+    private WeatherApi weatherApi;
+
+    // Auto-scroll related
+    private Runnable autoScrollRunnable;
 
     private void initializeLocation() {
         locationRequest = new LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
@@ -162,19 +236,9 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         tasksRecyclerView = findViewById(R.id.tasksRecyclerView);
         emptyTasksView = findViewById(R.id.emptyTasksView);
         menuButton = findViewById(R.id.menuButton);
-        
+
         // Initialize news category views
-        TextView buksuNewsButton = findViewById(R.id.buksuNewsButton);
         TextView schoolNewsButton = findViewById(R.id.schoolNewsButton);
-        
-        // Set up news category click listeners
-        buksuNewsButton.setOnClickListener(v -> {
-            fetchBuksuNews();
-        });
-        
-        schoolNewsButton.setOnClickListener(v -> {
-            showSchoolSelectionDialog();
-        });
 
         // Initialize news views
         newsRecyclerView = findViewById(R.id.newsRecyclerView);
@@ -184,32 +248,31 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         LinearLayoutManager newsLayoutManager = new LinearLayoutManager(this,
             LinearLayoutManager.HORIZONTAL, false);
         newsRecyclerView.setLayoutManager(newsLayoutManager);
-        
+
         // Add PagerSnapHelper to snap to full items
         PagerSnapHelper newsSnapHelper = new PagerSnapHelper();
         newsSnapHelper.attachToRecyclerView(newsRecyclerView);
-        
+
+        // Remove any item decoration that might add spacing
+        for (int i = 0; i < newsRecyclerView.getItemDecorationCount(); i++) {
+            newsRecyclerView.removeItemDecorationAt(i);
+        }
+
         // Initialize adapter
         newsAdapter = new NewsAdapter(this);
         newsRecyclerView.setAdapter(newsAdapter);
-
-        // Initialize auto-scroll handler
-        autoScrollHandler = new Handler();
-        autoScrollRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (newsAdapter.getItemCount() > 0 && isActivityActive) {
-                    int currentPosition = ((LinearLayoutManager) newsRecyclerView.getLayoutManager())
-                            .findFirstVisibleItemPosition();
-                    int nextPosition = (currentPosition + 1) % newsAdapter.getItemCount();
-                    newsRecyclerView.smoothScrollToPosition(nextPosition);
-                    
-                    // Schedule the next scroll
-                    autoScrollHandler.postDelayed(this, AUTO_SCROLL_DELAY);
-                }
-            }
-        };
-
+        
+        // Initialize API clients before using them
+        initializeApiClients();
+        
+        // Set up news category click listeners
+        schoolNewsButton.setOnClickListener(v -> {
+            showPopularSchoolsDialog();
+        });
+        
+        // Load BukSU news when the app first opens
+        fetchBuksuNews();
+        
         // Set up RecyclerView for tasks
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         tasksRecyclerView.setLayoutManager(layoutManager);
@@ -221,7 +284,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
-        // Configure Google Sign In
+        // Configure Google Sign In with explicit Tasks scope
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
@@ -229,7 +292,10 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
-
+        
+        // Check for existing Google Sign In account and initialize Tasks API
+        checkTasksApiAccess();
+        
         // Set up navigation drawer
         NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
@@ -287,7 +353,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                 }
             }
         });
-        
+
         // Initialize views
         quoteText = findViewById(R.id.quoteText);
         quoteAuthor = findViewById(R.id.quoteAuthor);
@@ -300,52 +366,73 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Initialize location client
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         initializeLocation();
-        
+
         // Create logging interceptor
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
         loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BASIC);
-        
+
         // Create OkHttpClient for all API calls
         OkHttpClient client = new OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
-        
+
         // Initialize ZenQuotesApi
         Retrofit zenQuotesRetrofit = new Retrofit.Builder()
             .baseUrl("https://zenquotes.io/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build();
-        
+
         zenQuotesApi = zenQuotesRetrofit.create(ZenQuotesApi.class);
-        
+
         // Initialize WeatherApi
         Retrofit weatherRetrofit = new Retrofit.Builder()
             .baseUrl("https://api.openweathermap.org/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build();
-        
+
         weatherApi = weatherRetrofit.create(WeatherApi.class);
-        
+
         // Initialize NewsApi
         Retrofit newsRetrofit = new Retrofit.Builder()
             .baseUrl("https://newsapi.org/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build();
-        
+
         newsApi = newsRetrofit.create(NewsApi.class);
-        
+
         // Initialize RSS feed service
         rssFeedService = new RssFeedService();
-        
+
+        // Initialize auto-scroll runnable
+        autoScrollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (newsRecyclerView != null && newsAdapter != null && newsAdapter.getItemCount() > 0) {
+                    // Get the current position
+                    int currentPosition = ((LinearLayoutManager) newsRecyclerView.getLayoutManager())
+                            .findFirstVisibleItemPosition();
+
+                    // Calculate next position (with wrap-around)
+                    int nextPosition = (currentPosition + 1) % newsAdapter.getItemCount();
+
+                    // Smooth scroll to the next position
+                    newsRecyclerView.smoothScrollToPosition(nextPosition);
+
+                    // Schedule the next scroll
+                    autoScrollHandler.postDelayed(this, AUTO_SCROLL_DELAY);
+                }
+            }
+        };
+
         // Start fetching data
         fetchQuote();
         checkLocationPermissionAndFetchWeather();
-        fetchEducationNews(); // Default news category
+        fetchBuksuNews(); // Default news category
     }
 
     private void setupTaskTypeDropdown() {
@@ -622,6 +709,15 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         Log.e(TAG, "Weather error: " + errorMessage);
     }
 
+    private void showNewsError(String errorMessage) {
+        newsProgress.setVisibility(View.GONE);
+        newsRecyclerView.setVisibility(View.GONE);
+
+        // Show error message
+        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
+        Log.e(TAG, "News error: " + errorMessage);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -648,22 +744,16 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.nav_home) {
-            // Show dashboard content, hide fragment container
-            findViewById(R.id.tasksContainer).setVisibility(View.VISIBLE);
-            findViewById(R.id.appBarLayout).setVisibility(View.VISIBLE);
-            findViewById(R.id.fragmentContainer).setVisibility(View.GONE);
-        } else if (id == R.id.nav_calendar) {
-            // Handle calendar action
-            Toast.makeText(this, "Calendar feature coming soon", Toast.LENGTH_SHORT).show();
+        if (id == R.id.nav_dashboard) {
+            showDashboardFragment();
         } else if (id == R.id.nav_tasks) {
-            showTaskListFragment();
+            showTasksFragment();
+        } else if (id == R.id.nav_calendar) {
+            showCalendarFragment();
         } else if (id == R.id.nav_news) {
-            // Show the news fragment
             showNewsFragment();
-        } else if (id == R.id.nav_profile) {
-            // Handle profile action
-            Toast.makeText(this, "Profile feature coming soon", Toast.LENGTH_SHORT).show();
+        } else if (id == R.id.nav_settings) {
+            showSettingsFragment();
         } else if (id == R.id.nav_logout) {
             signOut();
         }
@@ -673,50 +763,60 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     }
 
     private void signOut() {
-                    // Show progress dialog
-                    ProgressDialog progressDialog = new ProgressDialog(this);
-                    progressDialog.setMessage("Signing out...");
-                    progressDialog.show();
+        // Sign out from Firebase
+        mAuth.signOut();
 
-                    // Sign out from Google
-                    mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            // Revoke access to ensure complete sign-out
+        // Sign out from Google and revoke access
+        mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
             mGoogleSignInClient.revokeAccess().addOnCompleteListener(this, revokeTask -> {
-                        // Sign out from Firebase
-                        mAuth.signOut();
-
-                // Dismiss progress dialog
-                        progressDialog.dismiss();
-
-                // Clear all activities and start login
-                        Intent intent = new Intent(DashboardActivity.this, LoginActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        startActivity(intent);
-                        finish();
-                    });
+                // Go to login screen
+                Intent intent = new Intent(DashboardActivity.this, LoginActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
+            });
         });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == ADD_TASK_REQUEST_CODE && resultCode == RESULT_OK) {
+        
+        if (requestCode == RC_SIGN_IN) {
+            Log.d(TAG, "Sign-in result received");
+            com.google.android.gms.tasks.Task<GoogleSignInAccount> task = 
+                GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(com.google.android.gms.common.api.ApiException.class);
+                if (account != null && account.getEmail() != null) {
+                    Log.d(TAG, "Sign-in successful: " + account.getEmail());
+                    initializeTasksApiService(account.getEmail());
+                } else {
+                    Log.e(TAG, "Sign-in successful but account or email is null");
+                    Toast.makeText(this, "Failed to get email from Google account", 
+                                 Toast.LENGTH_SHORT).show();
+                }
+            } catch (com.google.android.gms.common.api.ApiException e) {
+                Log.e(TAG, "signInResult:failed code=" + e.getStatusCode(), e);
+                Toast.makeText(this, "Google Sign In failed", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == REQUEST_AUTHORIZATION) {
+            if (resultCode == RESULT_OK) {
+                // Re-initialize the Tasks API service with the current account
+                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+                if (account != null && account.getEmail() != null) {
+                    initializeTasksApiService(account.getEmail());
+                }
+            }
+        } else if (requestCode == ADD_TASK_REQUEST_CODE && resultCode == RESULT_OK) {
             // Refresh task list when a new task is added
             loadTasks();
-            
+
             // Also refresh tasks in the TaskListFragment if it's active
             TaskListFragment taskListFragment = (TaskListFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.fragmentContainer);
             if (taskListFragment != null) {
                 taskListFragment.refreshTasks();
-            }
-        }
-        if (requestCode == REQUEST_AUTHORIZATION) {
-            if (resultCode == RESULT_OK) {
-                // Retry fetching tasks after authorization
-                loadTasks();
-            } else {
-                Toast.makeText(this, "Authorization required to access tasks", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -732,6 +832,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             public void onSuccess(List<Task> tasks) {
                 runOnUiThread(() -> {
                     if (tasks.isEmpty()) {
+                        // Show empty state message inside the card
                         emptyTasksView.setVisibility(View.VISIBLE);
                         tasksRecyclerView.setVisibility(View.GONE);
                     } else {
@@ -746,9 +847,10 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             public void onFailure(Exception e) {
                 runOnUiThread(() -> {
                     Log.e(TAG, "Failed to load tasks", e);
-                    Toast.makeText(DashboardActivity.this, 
-                        "Error loading tasks: " + e.getMessage(), 
+                    Toast.makeText(DashboardActivity.this,
+                        "Error loading tasks: " + e.getMessage(),
                         Toast.LENGTH_SHORT).show();
+                    // Show empty state message on error
                     emptyTasksView.setVisibility(View.VISIBLE);
                     tasksRecyclerView.setVisibility(View.GONE);
                 });
@@ -756,215 +858,142 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         });
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (tasksApiService != null) {
-            tasksApiService.shutdown();
-        }
-        // Clean up resources
-        if (fusedLocationClient != null && locationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(locationCallback);
-        }
-        // Clear references
-        weatherApi = null;
-        zenQuotesApi = null;
-        taskAdapter = null;
-        locationCallback = null;
-    }
-
     private void checkTasksApiAccess() {
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-        if (account != null && account.getGrantedScopes().contains(new Scope(TasksScopes.TASKS))) {
-            // We have proper access
+        if (account != null && account.getEmail() != null && !account.getEmail().isEmpty()) {
+            // We have proper access with a valid email
+            Log.d(TAG, "Using account: " + account.getEmail());
             initializeTasksApiService(account.getEmail());
         } else {
-            // Need to request access
-            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestEmail()
-                    .requestScopes(new Scope(TasksScopes.TASKS))
-                    .build();
-            GoogleSignInClient signInClient = GoogleSignIn.getClient(this, gso);
-            startActivityForResult(signInClient.getSignInIntent(), REQUEST_AUTHORIZATION);
+            // Need to request access or re-authenticate
+            Log.d(TAG, "No valid account found, requesting sign-in");
+            requestGoogleSignIn();
         }
     }
 
-    private void testTasksApi() {
-        if (tasksApiService != null) {
-            Log.d(TAG, "Testing Tasks API connection...");
-            tasksApiService.getTasks(new TasksApiService.TaskListCallback() {
-                @Override
-                public void onSuccess(List<Task> tasks) {
-                    Log.d(TAG, "Successfully retrieved " + tasks.size() + " tasks");
-                    runOnUiThread(() -> Toast.makeText(DashboardActivity.this,
-                        "Successfully retrieved " + tasks.size() + " tasks",
-                        Toast.LENGTH_SHORT).show());
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    Log.e(TAG, "Failed to retrieve tasks", e);
-                    runOnUiThread(() -> Toast.makeText(DashboardActivity.this,
-                        "Error: " + e.getMessage(),
-                        Toast.LENGTH_LONG).show());
-                }
-            });
-        } else {
-            Log.e(TAG, "TasksApiService is null");
-        }
+    private void requestGoogleSignIn() {
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(new Scope(TasksScopes.TASKS))
+                .build();
+        GoogleSignInClient signInClient = GoogleSignIn.getClient(this, gso);
+        
+        // Sign out first to ensure we get a fresh sign-in
+        signInClient.signOut().addOnCompleteListener(task -> {
+            Intent signInIntent = signInClient.getSignInIntent();
+            startActivityForResult(signInIntent, RC_SIGN_IN);
+        });
     }
 
     private void initializeTasksApiService(String email) {
         try {
+            if (email == null || email.isEmpty()) {
+                Log.e(TAG, "Cannot initialize TasksApiService with null or empty email");
+                Toast.makeText(this, "Invalid account email", Toast.LENGTH_SHORT).show();
+                requestGoogleSignIn();
+                return;
+            }
+            
+            Log.d(TAG, "Initializing TasksApiService with email: " + email);
             tasksApiService = new TasksApiService(this, email);
-            testTasksConnection();
             loadTasks();
         } catch (Exception e) {
             Log.e(TAG, "Error initializing TasksApiService", e);
             Toast.makeText(this, "Error initializing tasks service: " + e.getMessage(),
                           Toast.LENGTH_SHORT).show();
+            requestGoogleSignIn();
         }
     }
 
     private void testTasksConnection() {
-        if (tasksApiService != null) {
-            Log.d(TAG, "Testing Tasks API connection...");
-            tasksApiService.getTasks(new TasksApiService.TaskListCallback() {
-                @Override
-                public void onSuccess(List<Task> tasks) {
-                    runOnUiThread(() -> {
-                        String message = "Successfully connected to Tasks API. Found " + tasks.size() + " tasks.";
-                        Log.d(TAG, message);
-                        Toast.makeText(DashboardActivity.this, message, Toast.LENGTH_SHORT).show();
-                    });
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    runOnUiThread(() -> {
-                        String error = "Tasks API Error: " + e.getMessage();
-                        Log.e(TAG, error, e);
-                        Toast.makeText(DashboardActivity.this, error, Toast.LENGTH_LONG).show();
-                    });
-                }
-            });
-        } else {
-            Log.e(TAG, "TasksApiService is not initialized");
-        }
-    }
-
-    public void fetchEducationNews() {
-        newsProgress.setVisibility(View.VISIBLE);
-        newsRecyclerView.setVisibility(View.GONE);
-        
-        String apiKey = getString(R.string.news_api_key);
-        
-        newsApi.getEducationNews(
-            "\"DepEd\" OR \"Department of Education Philippines\" OR \"Philippine education\" OR \"Philippine schools\"",
-            "publishedAt",
-            "en",
-            apiKey
-        ).enqueue(new Callback<NewsResponse>() {
-            @Override
-            public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
-                newsProgress.setVisibility(View.GONE);
-                
-                if (response.isSuccessful() && response.body() != null && 
-                    !response.body().getArticles().isEmpty()) {
-                    
-                    List<NewsArticle> articles = response.body().getArticles();
-                    // Limit to 5 articles
-                    if (articles.size() > 5) {
-                        articles = articles.subList(0, 5);
-                    }
-                    
-                    newsAdapter.setNewsArticles(articles);
-                    newsRecyclerView.setVisibility(View.VISIBLE);
-                    
-                    // Start auto-scrolling once we have news articles
-                    startAutoScroll();
-                } else {
-                    showNewsError("Failed to load DepEd news");
-                }
-            }
-            
-            @Override
-            public void onFailure(Call<NewsResponse> call, Throwable t) {
-                newsProgress.setVisibility(View.GONE);
-                showNewsError("Network error: " + t.getMessage());
-            }
-        });
-    }
-
-    private void showNewsError(String message) {
-        Toast.makeText(this, "News error: " + message, Toast.LENGTH_SHORT).show();
-        newsRecyclerView.setVisibility(View.GONE);
+        // Test connection to Tasks API
     }
 
     private void startAutoScroll() {
         // Remove any existing callbacks to avoid duplicates
         stopAutoScroll();
+        
+        // Create auto-scroll runnable if not already created
+        if (autoScrollRunnable == null) {
+            autoScrollRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (newsAdapter.getItemCount() > 0 && isActivityActive) {
+                        int currentPosition = ((LinearLayoutManager) newsRecyclerView.getLayoutManager())
+                                .findFirstVisibleItemPosition();
+                        int nextPosition = (currentPosition + 1) % newsAdapter.getItemCount();
+                        newsRecyclerView.smoothScrollToPosition(nextPosition);
+                        
+                        // Schedule the next scroll
+                        autoScrollHandler.postDelayed(this, AUTO_SCROLL_DELAY);
+                    }
+                }
+            };
+        }
+        
         // Start auto-scrolling
         autoScrollHandler.postDelayed(autoScrollRunnable, AUTO_SCROLL_DELAY);
     }
 
     private void stopAutoScroll() {
         // Remove the auto-scroll callback
-        autoScrollHandler.removeCallbacks(autoScrollRunnable);
+        if (autoScrollHandler != null && autoScrollRunnable != null) {
+            autoScrollHandler.removeCallbacks(autoScrollRunnable);
+        }
     }
 
     private void fetchDepEdRssFeed() {
         newsProgress.setVisibility(View.VISIBLE);
         newsRecyclerView.setVisibility(View.GONE);
-        
+
         // DepEd official RSS feed URL
         String depEdRssFeedUrl = "https://www.deped.gov.ph/feed/";
-        
+
         rssFeedService.fetchFeed(depEdRssFeedUrl, new RssFeedService.RssFeedCallback() {
             @Override
             public void onSuccess(List<NewsArticle> newsArticles) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    
+
                     if (newsArticles.isEmpty()) {
                         showNewsError("No news articles found");
                         return;
                     }
-                    
+
                     // Create a new list to avoid modifying the original
                     List<NewsArticle> limitedArticles = new ArrayList<>(newsArticles);
                     // Limit to 5 articles
                     if (limitedArticles.size() > 5) {
                         limitedArticles = limitedArticles.subList(0, 5);
                     }
-                    
+
                     newsAdapter.setNewsArticles(limitedArticles);
                     newsRecyclerView.setVisibility(View.VISIBLE);
-                    
+
                     // Start auto-scrolling once we have news articles
                     startAutoScroll();
                 });
             }
-            
+
             @Override
             public void onFailure(Exception e) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    showNewsError("Error loading news: " + e.getMessage());
+                    // Instead of just showing an error, try the fallback search
+                    searchDepEdTopHeadlines();
                 });
             }
         });
     }
 
-    // Add this method to fetch news for a specific school
     private void fetchSchoolNews(String schoolName) {
         newsProgress.setVisibility(View.VISIBLE);
         newsRecyclerView.setVisibility(View.GONE);
-        
+
+        // Use NewsAPI to search for school news with a more comprehensive query
+        // Add "university" and "college" to improve search results
+        String query = "\"" + schoolName + "\" AND (university OR college OR education OR students OR campus)";
         String apiKey = getString(R.string.news_api_key);
-        
-        // Create a query that combines the school name with education-related terms
-        String query = "\"" + schoolName + "\" AND (education OR school OR students OR teachers)";
         
         newsApi.getSchoolNews(
             query,
@@ -975,79 +1004,80 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             @Override
             public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
                 newsProgress.setVisibility(View.GONE);
-                
-                if (response.isSuccessful() && response.body() != null && 
+
+                if (response.isSuccessful() && response.body() != null &&
                     !response.body().getArticles().isEmpty()) {
-                    
+
                     List<NewsArticle> articles = response.body().getArticles();
                     // Limit to 5 articles
                     List<NewsArticle> limitedArticles = new ArrayList<>(articles);
                     if (limitedArticles.size() > 5) {
                         limitedArticles = limitedArticles.subList(0, 5);
                     }
-                    
+
                     newsAdapter.setNewsArticles(limitedArticles);
                     newsRecyclerView.setVisibility(View.VISIBLE);
-                    
+
                     // Start auto-scrolling once we have news articles
                     startAutoScroll();
                 } else {
-                    showNewsError("No news found for " + schoolName);
+                    // If no results from NewsAPI, try RSS feed approach
+                    fetchSchoolRssFeed(schoolName);
                 }
             }
-            
+
             @Override
             public void onFailure(Call<NewsResponse> call, Throwable t) {
                 newsProgress.setVisibility(View.GONE);
-                showNewsError("Network error: " + t.getMessage());
+                // Try RSS feed approach on failure
+                fetchSchoolRssFeed(schoolName);
             }
         });
     }
 
-    // Alternative method using RSS feeds for school-specific news
     private void fetchSchoolRssFeed(String schoolName) {
         newsProgress.setVisibility(View.VISIBLE);
         newsRecyclerView.setVisibility(View.GONE);
-        
-        // You can use a general education RSS feed and filter it
+
+        // Use a general education news feed and filter for the school
         String educationRssFeedUrl = "https://www.deped.gov.ph/feed/";
-        
+
         rssFeedService.fetchFeed(educationRssFeedUrl, new RssFeedService.RssFeedCallback() {
             @Override
             public void onSuccess(List<NewsArticle> newsArticles) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    
+
                     // Filter articles that mention the school name
                     List<NewsArticle> schoolArticles = new ArrayList<>();
                     for (NewsArticle article : newsArticles) {
-                        if ((article.getTitle() != null && 
+                        if ((article.getTitle() != null &&
                              article.getTitle().toLowerCase().contains(schoolName.toLowerCase())) ||
-                            (article.getDescription() != null && 
+                            (article.getDescription() != null &&
                              article.getDescription().toLowerCase().contains(schoolName.toLowerCase()))) {
                             schoolArticles.add(article);
                         }
                     }
-                    
+
                     if (schoolArticles.isEmpty()) {
                         showNewsError("No news found for " + schoolName);
                         return;
                     }
-                    
+
                     // Limit to 5 articles
                     List<NewsArticle> limitedArticles = new ArrayList<>(schoolArticles);
                     if (limitedArticles.size() > 5) {
                         limitedArticles = limitedArticles.subList(0, 5);
                     }
-                    
+
                     newsAdapter.setNewsArticles(limitedArticles);
                     newsRecyclerView.setVisibility(View.VISIBLE);
-                    
+
                     // Start auto-scrolling once we have news articles
                     startAutoScroll();
                 });
             }
-            
+
             @Override
             public void onFailure(Exception e) {
                 runOnUiThread(() -> {
@@ -1058,18 +1088,19 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         });
     }
 
-    public void showSchoolSelectionDialog() {
-        // Create an EditText for user input
-        final EditText input = new EditText(this);
+    private void showSchoolSelectionDialog() {
+        // Create an EditText for the dialog
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint("Enter school name");
-        
-        // Use LinearLayout to add padding
+
+        // Create a layout to add padding
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         int padding = getResources().getDimensionPixelSize(R.dimen.dialog_padding);
         layout.setPadding(padding, padding, padding, padding);
         layout.addView(input);
-        
+
         new MaterialAlertDialogBuilder(this)
             .setTitle("School News")
             .setView(layout)
@@ -1078,22 +1109,20 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                 if (!schoolName.isEmpty()) {
                     // Use NewsAPI for more accurate results
                     fetchSchoolNews(schoolName);
-                    // Or use RSS feed filtering
-                    // fetchSchoolRssFeed(schoolName);
                 }
             })
             .setNegativeButton("Cancel", null)
             .show();
     }
 
-    public void fetchBuksuNews() {
+    private void fetchBuksuNews() {
         newsProgress.setVisibility(View.VISIBLE);
         newsRecyclerView.setVisibility(View.GONE);
-        
+
+        // Try NewsAPI first for more comprehensive results
         String apiKey = getString(R.string.news_api_key);
         
-        // Create a specific query for Bukidnon State University
-        // Include the domain to get more relevant results
+        // Create a specific query for Bukidnon State University with all possible variations
         String query = "\"Bukidnon State University\" OR \"BukSU\" OR \"BSU Bukidnon\" OR buksu.edu.ph";
         
         newsApi.getSchoolNews(
@@ -1104,11 +1133,10 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         ).enqueue(new Callback<NewsResponse>() {
             @Override
             public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
-                newsProgress.setVisibility(View.GONE);
-                
                 if (response.isSuccessful() && response.body() != null && 
                     !response.body().getArticles().isEmpty()) {
                     
+                    newsProgress.setVisibility(View.GONE);
                     List<NewsArticle> articles = response.body().getArticles();
                     // Limit to 5 articles
                     List<NewsArticle> limitedArticles = new ArrayList<>(articles);
@@ -1140,24 +1168,24 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Try to fetch from Bukidnon State University's own RSS feed
         // Based on the website, let's try common RSS feed paths
         String buksuFeedUrl = "https://buksu.edu.ph/feed/";
-        
+
         // We'll also try alternative paths if the main one fails
         rssFeedService.fetchFeed(buksuFeedUrl, new RssFeedService.RssFeedCallback() {
             @Override
             public void onSuccess(List<NewsArticle> newsArticles) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    
+
                     if (!newsArticles.isEmpty()) {
                         // Limit to 5 articles
                         List<NewsArticle> limitedArticles = new ArrayList<>(newsArticles);
                         if (limitedArticles.size() > 5) {
                             limitedArticles = limitedArticles.subList(0, 5);
                         }
-                        
+
                         newsAdapter.setNewsArticles(limitedArticles);
                         newsRecyclerView.setVisibility(View.VISIBLE);
-                        
+
                         // Start auto-scrolling once we have news articles
                         startAutoScroll();
                     } else {
@@ -1166,7 +1194,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                     }
                 });
             }
-            
+
             @Override
             public void onFailure(Exception e) {
                 // Try alternative feed URL
@@ -1179,23 +1207,23 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     private void tryAlternativeBuksuFeed() {
         // Try alternative feed URL (news section)
         String altFeedUrl = "https://buksu.edu.ph/news/feed/";
-        
+
         rssFeedService.fetchFeed(altFeedUrl, new RssFeedService.RssFeedCallback() {
             @Override
             public void onSuccess(List<NewsArticle> newsArticles) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    
+
                     if (!newsArticles.isEmpty()) {
                         // Limit to 5 articles
                         List<NewsArticle> limitedArticles = new ArrayList<>(newsArticles);
                         if (limitedArticles.size() > 5) {
                             limitedArticles = limitedArticles.subList(0, 5);
                         }
-                        
+
                         newsAdapter.setNewsArticles(limitedArticles);
                         newsRecyclerView.setVisibility(View.VISIBLE);
-                        
+
                         // Start auto-scrolling once we have news articles
                         startAutoScroll();
                     } else {
@@ -1204,7 +1232,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                     }
                 });
             }
-            
+
             @Override
             public void onFailure(Exception e) {
                 // If all RSS feed attempts fail, fall back to DepEd feed filtering
@@ -1216,39 +1244,39 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     // Add this method to fetch and filter DepEd feed for BukSU
     private void fetchAndFilterDepEdFeedForBuksu() {
         String depEdFeedUrl = "https://www.deped.gov.ph/feed/";
-        
+
         rssFeedService.fetchFeed(depEdFeedUrl, new RssFeedService.RssFeedCallback() {
             @Override
             public void onSuccess(List<NewsArticle> newsArticles) {
                 runOnUiThread(() -> {
                     newsProgress.setVisibility(View.GONE);
-                    
+
                     // Filter articles that mention Bukidnon State University
                     List<NewsArticle> buksuArticles = new ArrayList<>();
                     for (NewsArticle article : newsArticles) {
                         String title = article.getTitle() != null ? article.getTitle().toLowerCase() : "";
                         String description = article.getDescription() != null ? article.getDescription().toLowerCase() : "";
-                        
-                        if (title.contains("bukidnon state university") || 
-                            title.contains("buksu") || 
+
+                        if (title.contains("bukidnon state university") ||
+                            title.contains("buksu") ||
                             title.contains("bsu bukidnon") ||
-                            description.contains("bukidnon state university") || 
-                            description.contains("buksu") || 
+                            description.contains("bukidnon state university") ||
+                            description.contains("buksu") ||
                             description.contains("bsu bukidnon")) {
                             buksuArticles.add(article);
                         }
                     }
-                    
+
                     if (!buksuArticles.isEmpty()) {
                         // Limit to 5 articles
                         List<NewsArticle> limitedArticles = new ArrayList<>(buksuArticles);
                         if (limitedArticles.size() > 5) {
                             limitedArticles = limitedArticles.subList(0, 5);
                         }
-                        
+
                         newsAdapter.setNewsArticles(limitedArticles);
                         newsRecyclerView.setVisibility(View.VISIBLE);
-                        
+
                         // Start auto-scrolling once we have news articles
                         startAutoScroll();
                     } else {
@@ -1256,7 +1284,7 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
                     }
                 });
             }
-            
+
             @Override
             public void onFailure(Exception e) {
                 runOnUiThread(() -> {
@@ -1271,22 +1299,30 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     private void showPopularSchoolsDialog() {
         // List of popular schools in the Philippines
         final String[] popularSchools = new String[] {
+            "Bukidnon State University", // Move BukSU to the top
             "University of the Philippines",
             "Ateneo de Manila University",
             "De La Salle University",
             "University of Santo Tomas",
+            "Polytechnic University of the Philippines",
+            "University of San Carlos",
             "Mindanao State University",
             "Central Mindanao University",
             "Xavier University",
-            "Far Eastern University"
+            "Far Eastern University",
+            "Silliman University",
+            "Other (Search)"  // Last option to search for a specific school
         };
-        
+
         new MaterialAlertDialogBuilder(this)
             .setTitle("Select School")
             .setItems(popularSchools, (dialog, which) -> {
                 if (which == popularSchools.length - 1) {
                     // Last option is "Other (Search)" - show search dialog
                     showSchoolSelectionDialog();
+                } else if (which == 0) {
+                    // First option is "Bukidnon State University" - use specialized method
+                    fetchBuksuNews();
                 } else {
                     // Fetch news for the selected school
                     fetchSchoolNews(popularSchools[which]);
@@ -1295,6 +1331,116 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             .setNegativeButton("Cancel", null)
             .show();
     }
+
+    private void fetchEducationNews() {
+        if (newsApi == null) {
+            // If newsApi is not initialized, show error and return
+            Toast.makeText(this, "News service not initialized", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        newsProgress.setVisibility(View.VISIBLE);
+        newsRecyclerView.setVisibility(View.GONE);
+
+        // Use NewsAPI to search specifically for DepEd news
+        String apiKey = getString(R.string.news_api_key);
+        
+        // First try with specific DepEd search
+        newsApi.getEducationNews(
+            "\"DepEd\" OR \"Department of Education Philippines\" OR \"Department of Education PH\"",
+            "publishedAt",
+            "en",
+            apiKey
+        ).enqueue(new Callback<NewsResponse>() {
+            @Override
+            public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
+                newsProgress.setVisibility(View.GONE);
+                
+                if (response.isSuccessful() && response.body() != null && 
+                    !response.body().getArticles().isEmpty()) {
+                    
+                    List<NewsArticle> articles = response.body().getArticles();
+                    // Limit to 5 articles
+                    List<NewsArticle> limitedArticles = new ArrayList<>(articles);
+                    if (limitedArticles.size() > 5) {
+                        limitedArticles = limitedArticles.subList(0, 5);
+                    }
+                    
+                    newsAdapter.setNewsArticles(limitedArticles);
+                    newsRecyclerView.setVisibility(View.VISIBLE);
+                    
+                    // Start auto-scrolling once we have news articles
+                    startAutoScroll();
+                } else {
+                    // If specific search doesn't work, try the fallback method directly
+                    // instead of calling fetchDepEdRssFeed to avoid ambiguity
+                    searchDepEdTopHeadlines();
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<NewsResponse> call, Throwable t) {
+                newsProgress.setVisibility(View.GONE);
+                // Try the fallback method directly instead of calling fetchDepEdRssFeed
+                searchDepEdTopHeadlines();
+            }
+        });
+    }
+
+    // Add this new method for the fallback search
+    private void searchDepEdTopHeadlines() {
+        // Last resort - try a broader search but still focused on DepEd
+        if (newsApi == null) {
+            newsProgress.setVisibility(View.GONE);
+            showNewsError("Failed to load DepEd news");
+            return;
+        }
+        
+        newsProgress.setVisibility(View.VISIBLE);
+        newsRecyclerView.setVisibility(View.GONE);
+
+        // Use a broader query but still focused on DepEd and Philippines
+        String apiKey = getString(R.string.news_api_key);
+        newsApi.getTopHeadlines(
+            "ph", // Philippines country code
+            "education", 
+            "DepEd OR \"Department of Education\"",
+            apiKey
+        ).enqueue(new Callback<NewsResponse>() {
+            @Override
+            public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
+                newsProgress.setVisibility(View.GONE);
+                
+                if (response.isSuccessful() && response.body() != null && 
+                    !response.body().getArticles().isEmpty()) {
+                    
+                    List<NewsArticle> articles = response.body().getArticles();
+                    // Limit to 5 articles
+                    List<NewsArticle> limitedArticles = new ArrayList<>(articles);
+                    if (limitedArticles.size() > 5) {
+                        limitedArticles = limitedArticles.subList(0, 5);
+                    }
+                    
+                    newsAdapter.setNewsArticles(limitedArticles);
+                    newsRecyclerView.setVisibility(View.VISIBLE);
+                    
+                    // Start auto-scrolling once we have news articles
+                    startAutoScroll();
+                } else {
+                    newsProgress.setVisibility(View.GONE);
+                    showNewsError("No DepEd news found. Please try again later.");
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<NewsResponse> call, Throwable t) {
+                newsProgress.setVisibility(View.GONE);
+                showNewsError("Error loading DepEd news: " + t.getMessage());
+            }
+        });
+    }
+
+    // Removed duplicate showNewsError method
 
     // Add this method to get the TasksApiService
     public TasksApiService getTasksApiService() {
@@ -1312,17 +1458,17 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Hide all other content
         findViewById(R.id.tasksContainer).setVisibility(View.GONE);
         findViewById(R.id.appBarLayout).setVisibility(View.GONE);
-        
+
         // Show fragment container
         View fragmentContainer = findViewById(R.id.fragmentContainer);
         fragmentContainer.setVisibility(View.VISIBLE);
-        
+
         // Make sure it fills the screen
         ViewGroup.LayoutParams params = fragmentContainer.getLayoutParams();
         params.height = ViewGroup.LayoutParams.MATCH_PARENT;
         params.width = ViewGroup.LayoutParams.MATCH_PARENT;
         fragmentContainer.setLayoutParams(params);
-        
+
         // Load the TaskListFragment
         getSupportFragmentManager().beginTransaction()
             .replace(R.id.fragmentContainer, new TaskListFragment())
@@ -1343,17 +1489,17 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Hide all other content
         findViewById(R.id.tasksContainer).setVisibility(View.GONE);
         findViewById(R.id.appBarLayout).setVisibility(View.GONE);
-        
+
         // Show fragment container
         View fragmentContainer = findViewById(R.id.fragmentContainer);
         fragmentContainer.setVisibility(View.VISIBLE);
-        
+
         // Make sure it fills the screen
         ViewGroup.LayoutParams params = fragmentContainer.getLayoutParams();
         params.height = ViewGroup.LayoutParams.MATCH_PARENT;
         params.width = ViewGroup.LayoutParams.MATCH_PARENT;
         fragmentContainer.setLayoutParams(params);
-        
+
         // Load the NewsFragment
         getSupportFragmentManager().beginTransaction()
             .replace(R.id.fragmentContainer, new NewsFragment())
@@ -1368,7 +1514,294 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             }
         }
     }
+
+    // Add this method to handle calendar navigation
+    private void showCalendarFragment() {
+        // Hide all other content
+        findViewById(R.id.tasksContainer).setVisibility(View.GONE);
+        findViewById(R.id.appBarLayout).setVisibility(View.GONE);
+
+        // Show fragment container
+        View fragmentContainer = findViewById(R.id.fragmentContainer);
+        fragmentContainer.setVisibility(View.VISIBLE);
+
+        // Make sure it fills the screen
+        ViewGroup.LayoutParams params = fragmentContainer.getLayoutParams();
+        params.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+        fragmentContainer.setLayoutParams(params);
+
+        // Load the CalendarFragment
+        getSupportFragmentManager().beginTransaction()
+            .replace(R.id.fragmentContainer, new CalendarFragment())
+            .commit();
+
+        setTitle("Calendar");
+        drawerLayout.closeDrawer(GravityCompat.START);
+    }
+
+    // Add these helper methods for the updated navigation
+    private void showDashboardFragment() {
+        // Show dashboard content, hide fragment container
+        findViewById(R.id.tasksContainer).setVisibility(View.VISIBLE);
+        findViewById(R.id.appBarLayout).setVisibility(View.VISIBLE);
+        findViewById(R.id.fragmentContainer).setVisibility(View.GONE);
+        setTitle("Dashboard");
+    }
+
+    private void showTasksFragment() {
+        showTaskListFragment();
+        setTitle("Tasks");
+    }
+
+    private void showSettingsFragment() {
+        Toast.makeText(this, "Settings feature coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showAboutFragment() {
+        Toast.makeText(this, "About feature coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    // Add this method to initialize API clients
+    private void initializeApiClients() {
+        // Create logging interceptor
+        HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BASIC);
+
+        // Create OkHttpClient for all API calls
+        OkHttpClient client = new OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build();
+
+        // Initialize ZenQuotesApi
+        Retrofit zenQuotesRetrofit = new Retrofit.Builder()
+            .baseUrl("https://zenquotes.io/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+        zenQuotesApi = zenQuotesRetrofit.create(ZenQuotesApi.class);
+
+        // Initialize WeatherApi
+        Retrofit weatherRetrofit = new Retrofit.Builder()
+            .baseUrl("https://api.openweathermap.org/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+        weatherApi = weatherRetrofit.create(WeatherApi.class);
+
+        // Initialize NewsApi
+        Retrofit newsRetrofit = new Retrofit.Builder()
+            .baseUrl("https://newsapi.org/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+        newsApi = newsRetrofit.create(NewsApi.class);
+        
+        // Initialize RssFeedService
+        rssFeedService = new RssFeedService();
+    }
+
+    // Add this new method to fetch combined news from BukSU, CMU and USTP
+    private void fetchLocalUniversityNews() {
+        newsProgress.setVisibility(View.VISIBLE);
+        newsRecyclerView.setVisibility(View.GONE);
+
+        // Create a combined query for all three universities
+        String apiKey = getString(R.string.news_api_key);
+        String query = "\"Bukidnon State University\" OR \"BukSU\" OR " +
+                       "\"Central Mindanao University\" OR \"CMU\" OR " +
+                       "\"University of Science and Technology of Southern Philippines\" OR \"USTP\"";
+        
+        newsApi.getSchoolNews(
+            query,
+            "publishedAt",
+            "en",
+            apiKey
+        ).enqueue(new Callback<NewsResponse>() {
+            @Override
+            public void onResponse(Call<NewsResponse> call, Response<NewsResponse> response) {
+                newsProgress.setVisibility(View.GONE);
+                
+                if (response.isSuccessful() && response.body() != null && 
+                    !response.body().getArticles().isEmpty()) {
+                    
+                    List<NewsArticle> articles = response.body().getArticles();
+                    // Limit to 5 articles
+                    List<NewsArticle> limitedArticles = new ArrayList<>(articles);
+                    if (limitedArticles.size() > 5) {
+                        limitedArticles = limitedArticles.subList(0, 5);
+                    }
+                    
+                    newsAdapter.setNewsArticles(limitedArticles);
+                    newsRecyclerView.setVisibility(View.VISIBLE);
+                    
+                    // Start auto-scrolling once we have news articles
+                    startAutoScroll();
+                } else {
+                    // If no results from NewsAPI, try fetching from each university separately
+                    fetchCombinedUniversityFeeds();
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<NewsResponse> call, Throwable t) {
+                // On failure, try fetching from each university separately
+                fetchCombinedUniversityFeeds();
+            }
+        });
+    }
+
+    // Add this method to fetch from each university's feed and combine results
+    private void fetchCombinedUniversityFeeds() {
+        // Try to fetch from each university's RSS feed
+        final List<NewsArticle> combinedArticles = new ArrayList<>();
+        final int[] completedRequests = {0};
+        final int totalRequests = 3;
+        
+        // 1. Fetch BukSU news
+        String buksuFeedUrl = "https://buksu.edu.ph/feed/";
+        rssFeedService.fetchFeed(buksuFeedUrl, new RssFeedService.RssFeedCallback() {
+            @Override
+            public void onSuccess(List<NewsArticle> newsArticles) {
+                synchronized (combinedArticles) {
+                    // Add BukSU articles and tag them
+                    for (NewsArticle article : newsArticles) {
+                        if (article.getTitle() != null && !article.getTitle().contains("[BukSU]")) {
+                            article.setTitle("[BukSU] " + article.getTitle());
+                        }
+                        combinedArticles.add(article);
+                    }
+                    
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+            
+            @Override
+            public void onFailure(Exception e) {
+                synchronized (combinedArticles) {
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+        });
+        
+        // 2. Fetch CMU news
+        String cmuFeedUrl = "https://www.cmu.edu.ph/feed/";
+        rssFeedService.fetchFeed(cmuFeedUrl, new RssFeedService.RssFeedCallback() {
+            @Override
+            public void onSuccess(List<NewsArticle> newsArticles) {
+                synchronized (combinedArticles) {
+                    // Add CMU articles and tag them
+                    for (NewsArticle article : newsArticles) {
+                        if (article.getTitle() != null && !article.getTitle().contains("[CMU]")) {
+                            article.setTitle("[CMU] " + article.getTitle());
+                        }
+                        combinedArticles.add(article);
+                    }
+                    
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+            
+            @Override
+            public void onFailure(Exception e) {
+                synchronized (combinedArticles) {
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+        });
+        
+        // 3. Fetch USTP news
+        String ustpFeedUrl = "https://www.ustp.edu.ph/feed/";
+        rssFeedService.fetchFeed(ustpFeedUrl, new RssFeedService.RssFeedCallback() {
+            @Override
+            public void onSuccess(List<NewsArticle> newsArticles) {
+                synchronized (combinedArticles) {
+                    // Add USTP articles and tag them
+                    for (NewsArticle article : newsArticles) {
+                        if (article.getTitle() != null && !article.getTitle().contains("[USTP]")) {
+                            article.setTitle("[USTP] " + article.getTitle());
+                        }
+                        combinedArticles.add(article);
+                    }
+                    
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+            
+            @Override
+            public void onFailure(Exception e) {
+                synchronized (combinedArticles) {
+                    completedRequests[0]++;
+                    checkAndDisplayCombinedResults(combinedArticles, completedRequests[0], totalRequests);
+                }
+            }
+        });
+    }
+
+    // Helper method to check if all requests are complete and display results
+    private void checkAndDisplayCombinedResults(List<NewsArticle> combinedArticles, int completedRequests, int totalRequests) {
+        if (completedRequests >= totalRequests) {
+            runOnUiThread(() -> {
+                newsProgress.setVisibility(View.GONE);
+                
+                if (!combinedArticles.isEmpty()) {
+                    // Limit to 5 articles
+                    List<NewsArticle> limitedArticles = new ArrayList<>(combinedArticles);
+                    if (limitedArticles.size() > 5) {
+                        limitedArticles = limitedArticles.subList(0, 5);
+                    }
+                    
+                    newsAdapter.setNewsArticles(limitedArticles);
+                    newsRecyclerView.setVisibility(View.VISIBLE);
+                    
+                    // Start auto-scrolling once we have news articles
+                    startAutoScroll();
+                } else {
+                    // If still no results, fall back to education news
+                    fetchEducationNews();
+                }
+            });
+        }
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

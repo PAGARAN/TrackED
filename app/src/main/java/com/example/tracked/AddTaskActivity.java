@@ -59,7 +59,11 @@ public class AddTaskActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_task);
 
-        // Initialize Google Sign In
+        // Initialize views and other setup
+        initializeViews();
+        setupTaskTypeDropdown();
+
+        // Configure Google Sign In with explicit Tasks scope
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .requestScopes(new Scope(TasksScopes.TASKS))
@@ -67,32 +71,53 @@ public class AddTaskActivity extends AppCompatActivity {
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Initialize views and other setup
-        initializeViews();
-        setupTaskTypeDropdown();
-
         // Check for existing Google Sign In account
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         if (account != null && account.getEmail() != null) {
+            Log.d(TAG, "Found signed in account: " + account.getEmail());
             initializeTasksApiService(account.getEmail());
         } else {
+            Log.d(TAG, "No signed in account found, requesting sign-in");
             signIn();
         }
     }
 
     private void initializeTasksApiService(String email) {
         try {
+            if (email == null || email.isEmpty()) {
+                Log.e(TAG, "Cannot initialize TasksApiService with null or empty email");
+                Toast.makeText(this, "Invalid account email", Toast.LENGTH_SHORT).show();
+                signIn(); // Try to sign in again
+                return;
+            }
+            
+            Log.d(TAG, "Initializing TasksApiService with email: " + email);
             tasksApiService = new TasksApiService(this, email);
         } catch (Exception e) {
             Log.e(TAG, "Error initializing TasksApiService", e);
             Toast.makeText(this, "Error initializing Tasks API: " + e.getMessage(), 
                          Toast.LENGTH_LONG).show();
+            signIn(); // Try to sign in again
         }
     }
 
     private void signIn() {
-        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, RC_SIGN_IN);
+        Log.d(TAG, "Starting sign-in process");
+        
+        // Configure sign-in to request the user's ID, email address, and basic profile
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(new Scope(TasksScopes.TASKS))
+                .build();
+        
+        mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+        
+        // Sign out first to ensure we get a fresh sign-in
+        mGoogleSignInClient.signOut().addOnCompleteListener(task -> {
+            Log.d(TAG, "Sign-out completed, starting sign-in intent");
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            startActivityForResult(signInIntent, RC_SIGN_IN);
+        });
     }
 
     @Override
@@ -100,12 +125,21 @@ public class AddTaskActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == RC_SIGN_IN) {
+            Log.d(TAG, "Sign-in result received with resultCode: " + resultCode);
             com.google.android.gms.tasks.Task<GoogleSignInAccount> task = 
                 GoogleSignIn.getSignedInAccountFromIntent(data);
             handleSignInResult(task);
         } else if (requestCode == REQUEST_AUTHORIZATION) {
+            Log.d(TAG, "Authorization result received with resultCode: " + resultCode);
             if (resultCode == RESULT_OK) {
-                addTask();
+                // Re-initialize the Tasks API service with the current account
+                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+                if (account != null && account.getEmail() != null) {
+                    initializeTasksApiService(account.getEmail());
+                    addTask();
+                } else {
+                    Toast.makeText(this, "Failed to get account after authorization", Toast.LENGTH_LONG).show();
+                }
             } else {
                 Toast.makeText(this, "Authorization required to add tasks", Toast.LENGTH_LONG).show();
             }
@@ -116,12 +150,31 @@ public class AddTaskActivity extends AppCompatActivity {
         try {
             GoogleSignInAccount account = completedTask.getResult(ApiException.class);
             if (account != null && account.getEmail() != null) {
+                Log.d(TAG, "Sign-in successful: " + account.getEmail());
                 initializeTasksApiService(account.getEmail());
+            } else {
+                Log.e(TAG, "Sign-in successful but account or email is null");
+                Toast.makeText(this, "Failed to get email from Google account", Toast.LENGTH_SHORT).show();
             }
         } catch (ApiException e) {
-            Log.w(TAG, "signInResult:failed code=" + e.getStatusCode());
-            Toast.makeText(this, "Google Sign In failed", Toast.LENGTH_SHORT).show();
-            finish();
+            Log.e(TAG, "signInResult:failed code=" + e.getStatusCode(), e);
+            Toast.makeText(this, "Google Sign In failed: " + getSignInErrorMessage(e.getStatusCode()), 
+                         Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String getSignInErrorMessage(int statusCode) {
+        switch (statusCode) {
+            case 7:
+                return "Network error. Please check your internet connection.";
+            case 10:
+                return "Developer error. Please contact support.";
+            case 12:
+                return "Sign in canceled by user.";
+            case 13:
+                return "Sign in currently in progress.";
+            default:
+                return "Error code: " + statusCode;
         }
     }
 

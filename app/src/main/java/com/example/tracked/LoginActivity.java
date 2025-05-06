@@ -39,11 +39,12 @@ public class LoginActivity extends AppCompatActivity {
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
-        // Configure Google Sign In with Tasks API scope
+        // Configure Google Sign In with minimal scopes
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
-                .requestScopes(new Scope(TasksScopes.TASKS))
+                // Remove TasksScopes if possible during testing
+                // .requestScopes(new Scope(TasksScopes.TASKS))
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
@@ -54,6 +55,9 @@ public class LoginActivity extends AppCompatActivity {
         
         // Set click listener for Google Sign In button
         googleSignInContainer.setOnClickListener(v -> signIn());
+        
+        // Log the web client ID to verify it's correct
+        Log.d(TAG, "Web client ID: " + getString(R.string.default_web_client_id));
     }
 
     @Override
@@ -71,19 +75,9 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(View.VISIBLE);
         googleSignInContainer.setEnabled(false);
 
-        // Clear any existing sign-in state
-        mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            try {
-                Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-                startActivityForResult(signInIntent, RC_SIGN_IN);
-            } catch (Exception e) {
-                Log.e(TAG, "Error creating sign in intent", e);
-                Toast.makeText(this, "Error starting sign in: " + e.getMessage(), 
-                             Toast.LENGTH_SHORT).show();
-                progressBar.setVisibility(View.GONE);
-                googleSignInContainer.setEnabled(true);
-            }
-        });
+        // Create a simple sign-in intent
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
     }
 
     @Override
@@ -97,11 +91,13 @@ public class LoginActivity extends AppCompatActivity {
                 Log.d(TAG, "Google sign in succeeded");
                 firebaseAuthWithGoogle(account.getIdToken());
             } catch (ApiException e) {
-                Log.e(TAG, "Google sign in failed", e);
+                Log.e(TAG, "Google sign in failed: " + e.getStatusCode(), e);
                 progressBar.setVisibility(View.GONE);
                 googleSignInContainer.setEnabled(true);
                 String errorMessage = "Google Sign In failed: " + e.getStatusCode();
-                if (e.getStatusCode() == 7) {
+                if (e.getStatusCode() == 12501) {
+                    errorMessage = "Sign in was canceled. Please try again.";
+                } else if (e.getStatusCode() == 7) {
                     errorMessage = "Network error. Please check your internet connection.";
                 } else if (e.getStatusCode() == 10) {
                     errorMessage = "Developer error. Please contact support.";
@@ -156,6 +152,15 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 }
+
+
+
+
+
+
+
+
+
 
 
 

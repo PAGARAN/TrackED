@@ -111,7 +111,7 @@ public class RssFeedService {
             }
         }
 
-        private NewsArticle readItem(XmlPullParser parser) throws XmlPullParserException, IOException {
+        private NewsArticle readItem(XmlPullParser parser) throws IOException, XmlPullParserException {
             parser.require(XmlPullParser.START_TAG, ns, "item");
             
             NewsArticle article = new NewsArticle();

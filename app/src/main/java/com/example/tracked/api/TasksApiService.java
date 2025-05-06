@@ -1,5 +1,6 @@
 package com.example.tracked.api;
 
+import android.accounts.Account;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -28,8 +29,10 @@ public class TasksApiService {
     private static final int REQUEST_AUTHORIZATION = 1002;
     
     private final Context context;
-    private final Tasks tasksService;
+    private Tasks tasksService;
     private final ExecutorService executor;
+    private final String accountName;
+    private GoogleAccountCredential credential;
 
     public interface TaskCallback {
         void onSuccess(Task task);
@@ -44,30 +47,71 @@ public class TasksApiService {
 
     public TasksApiService(Context context, String accountName) throws Exception {
         this.context = context;
+        
+        // Validate account name to prevent null pointer exceptions
+        if (accountName == null || accountName.isEmpty()) {
+            Log.e(TAG, "Account name is null or empty");
+            throw new IllegalArgumentException("Account name cannot be null or empty");
+        }
+        
+        this.accountName = accountName;
+        this.executor = Executors.newSingleThreadExecutor();
+        
         try {
-            GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
-                    context,
-                    Collections.singleton(TasksScopes.TASKS)
-            ).setSelectedAccountName(accountName);
-
-            // Build the Tasks service
-            tasksService = new Tasks.Builder(
-                    new NetHttpTransport(),
-                    GsonFactory.getDefaultInstance(),
-                    credential)
-                    .setApplicationName("TrackED")
-                    .build();
-
-            executor = Executors.newSingleThreadExecutor();
+            // Initialize credential
+            initializeCredential();
         } catch (Exception e) {
             Log.e(TAG, "Error initializing TasksApiService", e);
             throw new Exception("Failed to initialize Tasks API: " + e.getMessage());
         }
     }
+    
+    private void initializeCredential() throws Exception {
+        // Create credential with explicit account name
+        credential = GoogleAccountCredential.usingOAuth2(
+                context,
+                Collections.singleton(TasksScopes.TASKS)
+        );
+        
+        // Log the account name being used
+        Log.d(TAG, "Setting credential with account name: " + accountName);
+        credential.setSelectedAccountName(accountName);
+        
+        // Verify the account exists on the device
+        android.accounts.AccountManager accountManager = android.accounts.AccountManager.get(context);
+        Account[] accounts = accountManager.getAccountsByType("com.google");
+        boolean accountExists = false;
+        
+        for (Account account : accounts) {
+            Log.d(TAG, "Found account: " + account.name);
+            if (accountName.equals(account.name)) {
+                accountExists = true;
+                break;
+            }
+        }
+        
+        if (!accountExists) {
+            Log.e(TAG, "Account " + accountName + " not found on device");
+            throw new Exception("Account not found on device. Please sign in again.");
+        }
+        
+        // Build the Tasks service
+        tasksService = new Tasks.Builder(
+                new NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                credential)
+                .setApplicationName("TrackED")
+                .build();
+    }
 
     public void addTask(String title, String description, String dueDate, TaskCallback callback) {
         executor.execute(() -> {
             try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
                 // Get or create default task list with better error handling
                 TaskList defaultList = getOrCreateTaskList();
                 if (defaultList == null) {
@@ -102,16 +146,34 @@ public class TasksApiService {
 
     private TaskList getOrCreateTaskList() throws IOException {
         try {
-            TaskList taskList = tasksService.tasklists()
-                .list()
-                .execute()
-                .getItems()
+            // Verify credential is still valid
+            if (credential == null || credential.getSelectedAccountName() == null) {
+                throw new IOException("Invalid credential. Please sign in again.");
+            }
+            
+            // Log the account name being used
+            Log.d(TAG, "Getting task list for account: " + credential.getSelectedAccountName());
+            
+            // Get all task lists
+            com.google.api.services.tasks.model.TaskLists taskLists = tasksService.tasklists().list().execute();
+            
+            // Check if the response contains items
+            if (taskLists == null || taskLists.getItems() == null) {
+                Log.d(TAG, "No task lists found, creating a new one");
+                TaskList newList = new TaskList();
+                newList.setTitle("TrackED");
+                return tasksService.tasklists().insert(newList).execute();
+            }
+            
+            // Look for the TrackED task list
+            TaskList taskList = taskLists.getItems()
                 .stream()
                 .filter(list -> "TrackED".equals(list.getTitle()))
                 .findFirst()
                 .orElse(null);
 
             if (taskList == null) {
+                Log.d(TAG, "TrackED task list not found, creating a new one");
                 TaskList newList = new TaskList();
                 newList.setTitle("TrackED");
                 taskList = tasksService.tasklists().insert(newList).execute();
@@ -119,10 +181,11 @@ public class TasksApiService {
 
             return taskList;
         } catch (UserRecoverableAuthIOException e) {
-            throw e; // Propagate auth exceptions to be handled in getTasks
+            Log.e(TAG, "Authorization required", e);
+            throw e; // Propagate auth exceptions to be handled in calling methods
         } catch (Exception e) {
             Log.e(TAG, "Error in getOrCreateTaskList", e);
-            throw new IOException("Failed to get or create task list: " + e.getMessage());
+            throw new IOException("Failed to get or create task list: " + e.getMessage(), e);
         }
     }
 
@@ -133,6 +196,11 @@ public class TasksApiService {
     public void getTasks(TaskListCallback callback) {
         executor.execute(() -> {
             try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
                 Log.d(TAG, "Attempting to fetch tasks...");
                 TaskList defaultList = getOrCreateTaskList();
                 if (defaultList == null) {
@@ -160,6 +228,8 @@ public class TasksApiService {
                 if (context instanceof Activity) {
                     ((Activity) context).startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION);
                 }
+                new Handler(Looper.getMainLooper()).post(() -> 
+                    callback.onFailure(new Exception("Authorization required")));
             } catch (Exception e) {
                 Log.e(TAG, "Error getting tasks", e);
                 new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
@@ -167,6 +237,12 @@ public class TasksApiService {
         });
     }
 }
+
+
+
+
+
+
 
 
 
