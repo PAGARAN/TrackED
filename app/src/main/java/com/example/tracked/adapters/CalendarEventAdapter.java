@@ -7,22 +7,21 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.tracked.R;
 import com.example.tracked.models.CalendarEvent;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdapter.EventViewHolder> {
     private List<CalendarEvent> events = new ArrayList<>();
-    private SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
-    private SimpleDateFormat displayFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
+    private SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
+    private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
 
     public void setEvents(List<CalendarEvent> events) {
         this.events = events;
@@ -40,7 +39,56 @@ public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdap
     @Override
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         CalendarEvent event = events.get(position);
-        holder.bind(event);
+        
+        // Set event title
+        holder.titleText.setText(event.getTitle());
+        
+        // Format and set time
+        if (event.isAllDay()) {
+            holder.timeText.setText("All day");
+        } else {
+            String startTime = timeFormat.format(event.getStartTime());
+            String endTime = timeFormat.format(event.getEndTime());
+            holder.timeText.setText(startTime + " - " + endTime);
+        }
+        
+        // Set description if available
+        if (event.getDescription() != null && !event.getDescription().isEmpty()) {
+            holder.descriptionText.setVisibility(View.VISIBLE);
+            holder.descriptionText.setText(event.getDescription());
+        } else {
+            holder.descriptionText.setVisibility(View.GONE);
+        }
+        
+        // Set source badge
+        if (event.getSource() != null) {
+            holder.sourceText.setVisibility(View.VISIBLE);
+            holder.sourceText.setText(event.getSource());
+            
+            // Set different colors for different sources
+            if ("Google Calendar".equals(event.getSource())) {
+                holder.sourceText.setBackgroundResource(R.drawable.badge_google);
+            } else {
+                holder.sourceText.setBackgroundResource(R.drawable.badge_device);
+            }
+        } else {
+            holder.sourceText.setVisibility(View.GONE);
+        }
+        
+        // Set color indicator
+        if (event.getColor() != 0) {
+            holder.colorIndicator.setVisibility(View.VISIBLE);
+            holder.colorIndicator.setBackgroundColor(event.getColor());
+        } else {
+            // Default colors based on source
+            if ("Google Calendar".equals(event.getSource())) {
+                holder.colorIndicator.setVisibility(View.VISIBLE);
+                holder.colorIndicator.setBackgroundColor(Color.parseColor("#4285F4")); // Google blue
+            } else {
+                holder.colorIndicator.setVisibility(View.VISIBLE);
+                holder.colorIndicator.setBackgroundColor(Color.parseColor("#03A9F4")); // App blue
+            }
+        }
     }
 
     @Override
@@ -48,61 +96,22 @@ public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdap
         return events.size();
     }
 
-    class EventViewHolder extends RecyclerView.ViewHolder {
-        private View colorIndicator;
-        private TextView timeText;
-        private TextView titleText;
-        private TextView descriptionText;
+    static class EventViewHolder extends RecyclerView.ViewHolder {
+        TextView titleText;
+        TextView timeText;
+        TextView descriptionText;
+        TextView sourceText;
+        View colorIndicator;
+        CardView cardView;
 
-        public EventViewHolder(@NonNull View itemView) {
+        EventViewHolder(@NonNull View itemView) {
             super(itemView);
+            titleText = itemView.findViewById(R.id.eventTitleText);
+            timeText = itemView.findViewById(R.id.eventTimeText);
+            descriptionText = itemView.findViewById(R.id.eventDescriptionText);
+            sourceText = itemView.findViewById(R.id.eventSourceText);
             colorIndicator = itemView.findViewById(R.id.colorIndicator);
-            timeText = itemView.findViewById(R.id.timeText);
-            titleText = itemView.findViewById(R.id.titleText);
-            descriptionText = itemView.findViewById(R.id.descriptionText);
-        }
-
-        public void bind(CalendarEvent event) {
-            titleText.setText(event.getTitle());
-            
-            if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-                descriptionText.setVisibility(View.VISIBLE);
-                descriptionText.setText(event.getDescription());
-            } else {
-                descriptionText.setVisibility(View.GONE);
-            }
-            
-            // Set time
-            if (event.isAllDay()) {
-                timeText.setText("All day");
-            } else {
-                try {
-                    Date startDate = apiFormat.parse(event.getStartTime());
-                    if (startDate != null) {
-                        timeText.setText(displayFormat.format(startDate));
-                    } else {
-                        timeText.setText("--:--");
-                    }
-                } catch (ParseException e) {
-                    timeText.setText("--:--");
-                }
-            }
-            
-            // Set color indicator
-            int color;
-            if ("task".equals(event.getEventType())) {
-                color = Color.parseColor("#FF5722"); // Orange for tasks
-            } else if (event.getColor() != null && !event.getColor().isEmpty()) {
-                try {
-                    color = Color.parseColor(event.getColor());
-                } catch (IllegalArgumentException e) {
-                    color = Color.parseColor("#2196F3"); // Default blue
-                }
-            } else {
-                color = Color.parseColor("#2196F3"); // Default blue
-            }
-            
-            colorIndicator.setBackgroundColor(color);
+            cardView = itemView.findViewById(R.id.eventCardView);
         }
     }
 }

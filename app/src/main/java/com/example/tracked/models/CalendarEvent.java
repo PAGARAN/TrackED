@@ -1,16 +1,19 @@
 package com.example.tracked.models;
 
+import java.util.Date;
+
 public class CalendarEvent {
     private String id;
     private String title;
     private String description;
-    private String startTime;
-    private String endTime;
+    private Date startTime;
+    private Date endTime;
     private boolean allDay;
-    private String eventType;
-    private String color;
+    private int color;
+    private String source; // "Google Calendar" or "Device Calendar"
 
     public CalendarEvent() {
+        // Default constructor
     }
 
     public String getId() {
@@ -37,19 +40,19 @@ public class CalendarEvent {
         this.description = description;
     }
 
-    public String getStartTime() {
+    public Date getStartTime() {
         return startTime;
     }
 
-    public void setStartTime(String startTime) {
+    public void setStartTime(Date startTime) {
         this.startTime = startTime;
     }
 
-    public String getEndTime() {
+    public Date getEndTime() {
         return endTime;
     }
 
-    public void setEndTime(String endTime) {
+    public void setEndTime(Date endTime) {
         this.endTime = endTime;
     }
 
@@ -61,19 +64,20 @@ public class CalendarEvent {
         this.allDay = allDay;
     }
 
-    public String getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(String eventType) {
-        this.eventType = eventType;
-    }
-
-    public String getColor() {
+    public int getColor() {
         return color;
     }
 
-    public void setColor(String color) {
+    public void setColor(int color) {
         this.color = color;
     }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
 }
+

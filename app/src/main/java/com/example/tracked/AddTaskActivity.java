@@ -25,6 +25,7 @@ import java.util.TimeZone;
 import java.text.ParseException;
 
 import com.example.tracked.api.TasksApiService;
+import com.example.tracked.services.CalendarApiService;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -33,11 +34,22 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.Scope;
 import com.google.api.services.tasks.TasksScopes;
 import com.google.api.services.tasks.model.Task;
+import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.CalendarContract;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 public class AddTaskActivity extends AppCompatActivity {
     private static final String TAG = "AddTaskActivity";
     private static final int REQUEST_AUTHORIZATION = 1001;
     private static final int RC_SIGN_IN = 1002;
+    private static final int CALENDAR_PERMISSION_REQUEST_CODE = 1003;
 
     private GoogleSignInClient mGoogleSignInClient;
     private TasksApiService tasksApiService;
@@ -47,11 +59,17 @@ public class AddTaskActivity extends AppCompatActivity {
     private String selectedTaskType;
     private MaterialCardView startDateCard;
     private MaterialCardView dueDateCard;
+    private MaterialCardView addToCalendarCard;
     
     // Add these field declarations
     private EditText taskNameInput;
     private EditText descriptionInput;
     private MaterialButton addTaskButton;
+    private com.google.android.material.switchmaterial.SwitchMaterial addToCalendarSwitch;
+    private com.google.android.material.chip.Chip lowPriorityChip, mediumPriorityChip, highPriorityChip;
+    private String selectedPriority = "Medium"; // Default priority
+    private boolean addToCalendar = false;
+    private CalendarApiService calendarApiService;
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -62,6 +80,7 @@ public class AddTaskActivity extends AppCompatActivity {
         // Initialize views and other setup
         initializeViews();
         setupTaskTypeDropdown();
+        setupPriorityChips();
 
         // Configure Google Sign In with explicit Tasks scope
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -79,6 +98,12 @@ public class AddTaskActivity extends AppCompatActivity {
         } else {
             Log.d(TAG, "No signed in account found, requesting sign-in");
             signIn();
+        }
+        
+        // Initialize calendar service if we have permissions
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) 
+                == PackageManager.PERMISSION_GRANTED) {
+            calendarApiService = new CalendarApiService(this);
         }
     }
 
@@ -183,6 +208,16 @@ public class AddTaskActivity extends AppCompatActivity {
         descriptionInput = findViewById(R.id.descriptionInput);
         addTaskButton = findViewById(R.id.addTaskButton);
         ImageButton backButton = findViewById(R.id.backButton);
+        ImageButton saveButton = findViewById(R.id.saveButton);
+
+        // Initialize priority chips
+        lowPriorityChip = findViewById(R.id.lowPriorityChip);
+        mediumPriorityChip = findViewById(R.id.mediumPriorityChip);
+        highPriorityChip = findViewById(R.id.highPriorityChip);
+
+        // Initialize calendar switch
+        addToCalendarSwitch = findViewById(R.id.addToCalendarSwitch);
+        addToCalendarCard = findViewById(R.id.addToCalendarCard);
 
         if (addTaskButton == null) {
             Log.e(TAG, "Failed to find addTaskButton in layout");
@@ -193,6 +228,17 @@ public class AddTaskActivity extends AppCompatActivity {
 
         if (backButton != null) {
             backButton.setOnClickListener(v -> finish());
+        }
+
+        if (saveButton != null) {
+            saveButton.setOnClickListener(v -> {
+                if (tasksApiService != null) {
+                    addTask();
+                } else {
+                    Toast.makeText(this, "Tasks API not properly initialized", 
+                                 Toast.LENGTH_SHORT).show();
+                }
+            });
         }
 
         startDateCard = findViewById(R.id.startDateCard);
@@ -207,6 +253,16 @@ public class AddTaskActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Tasks API not properly initialized", 
                              Toast.LENGTH_SHORT).show();
+            }
+        });
+        
+        // Set up calendar switch listener
+        addToCalendarSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            addToCalendar = isChecked;
+            
+            // Request calendar permissions if needed
+            if (addToCalendar && calendarApiService == null) {
+                requestCalendarPermissions();
             }
         });
     }
@@ -227,6 +283,33 @@ public class AddTaskActivity extends AppCompatActivity {
                    .setCancelable(true)
                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                    .show();
+        });
+    }
+
+    private void setupPriorityChips() {
+        // Set medium as default selected
+        mediumPriorityChip.setChecked(true);
+        
+        // Set up click listeners
+        lowPriorityChip.setOnClickListener(v -> {
+            lowPriorityChip.setChecked(true);
+            mediumPriorityChip.setChecked(false);
+            highPriorityChip.setChecked(false);
+            selectedPriority = "Low";
+        });
+        
+        mediumPriorityChip.setOnClickListener(v -> {
+            lowPriorityChip.setChecked(false);
+            mediumPriorityChip.setChecked(true);
+            highPriorityChip.setChecked(false);
+            selectedPriority = "Medium";
+        });
+        
+        highPriorityChip.setOnClickListener(v -> {
+            lowPriorityChip.setChecked(false);
+            mediumPriorityChip.setChecked(false);
+            highPriorityChip.setChecked(true);
+            selectedPriority = "High";
         });
     }
 
@@ -288,20 +371,26 @@ public class AddTaskActivity extends AppCompatActivity {
             return;
         }
 
-        // Show loading state
-        addTaskButton.setEnabled(false);
-        addTaskButton.setText("Adding...");
-
-        // Include task type in description
+        // Include priority in description
         String fullDescription = "Type: " + (selectedTaskType != null ? selectedTaskType : "Not specified") + 
+                               "\nPriority: " + selectedPriority +
                                "\nStart Date: " + selectedStartDate + 
                                "\n\n" + description;
 
-        Log.d("AddTaskActivity", "Adding task - Title: " + title + ", Due: " + selectedDueDate);
+        // Disable button to prevent multiple submissions
+        addTaskButton.setEnabled(false);
+        addTaskButton.setText("Adding...");
+
+        Log.d(TAG, "Adding task - Title: " + title + ", Due: " + selectedDueDate);
 
         tasksApiService.addTask(title, fullDescription, selectedDueDate, new TasksApiService.TaskCallback() {
             @Override
             public void onSuccess(Task task) {
+                // If add to calendar is enabled, create a calendar event
+                if (addToCalendar && addToCalendarSwitch.isChecked()) {
+                    addTaskToCalendar(title, fullDescription, selectedDueDate);
+                }
+                
                 runOnUiThread(() -> {
                     Toast.makeText(AddTaskActivity.this, "Task added successfully", Toast.LENGTH_SHORT).show();
                     setResult(RESULT_OK);
@@ -325,5 +414,116 @@ public class AddTaskActivity extends AppCompatActivity {
                 startActivityForResult(intent, REQUEST_AUTHORIZATION);
             }
         });
+    }
+
+    private void requestCalendarPermissions() {
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR},
+                CALENDAR_PERMISSION_REQUEST_CODE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
+        if (requestCode == CALENDAR_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Initialize calendar service now that we have permission
+                calendarApiService = new CalendarApiService(this);
+                Toast.makeText(this, "Calendar permission granted", Toast.LENGTH_SHORT).show();
+            } else {
+                // Permission denied, disable the functionality
+                addToCalendar = false;
+                addToCalendarSwitch.setChecked(false);
+                Toast.makeText(this, "Calendar permission denied", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void addTaskToCalendar(String title, String description, String dueDate) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) 
+                != PackageManager.PERMISSION_GRANTED) {
+            return; // Skip if we don't have permission
+        }
+        
+        try {
+            // Parse due date
+            SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date date = apiFormat.parse(dueDate);
+            
+            if (date != null) {
+                // Create calendar event
+                ContentResolver cr = getContentResolver();
+                ContentValues values = new ContentValues();
+                
+                values.put(CalendarContract.Events.TITLE, "Task: " + title);
+                values.put(CalendarContract.Events.DESCRIPTION, description);
+                
+                // Set start time to due date
+                long startMillis = date.getTime();
+                values.put(CalendarContract.Events.DTSTART, startMillis);
+                
+                // Set end time to 1 hour after due date
+                long endMillis = startMillis + (60 * 60 * 1000);
+                values.put(CalendarContract.Events.DTEND, endMillis);
+                
+                // Get default calendar ID
+                long calendarId = getDefaultCalendarId();
+                values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
+                values.put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().getID());
+                
+                // Add a reminder (15 minutes before)
+                values.put(CalendarContract.Events.HAS_ALARM, 1);
+                
+                Uri uri = cr.insert(CalendarContract.Events.CONTENT_URI, values);
+                if (uri != null) {
+                    // Add reminder
+                    ContentValues reminderValues = new ContentValues();
+                    reminderValues.put(CalendarContract.Reminders.EVENT_ID, Long.parseLong(uri.getLastPathSegment()));
+                    reminderValues.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT);
+                    reminderValues.put(CalendarContract.Reminders.MINUTES, 15);
+                    cr.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues);
+                    
+                    Log.d(TAG, "Task added to calendar successfully");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding task to calendar", e);
+        }
+    }
+
+    private long getDefaultCalendarId() {
+        long calendarId = 1; // Default fallback
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) 
+                != PackageManager.PERMISSION_GRANTED) {
+            return calendarId;
+        }
+        
+        try {
+            // Get the default calendar
+            String[] projection = new String[]{CalendarContract.Calendars._ID};
+            String selection = CalendarContract.Calendars.IS_PRIMARY + "=1";
+            Cursor cursor = getContentResolver().query(
+                    CalendarContract.Calendars.CONTENT_URI,
+                    projection,
+                    selection,
+                    null,
+                    null);
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                int idIdx = cursor.getColumnIndex(CalendarContract.Calendars._ID);
+                if (idIdx != -1) {
+                    calendarId = cursor.getLong(idIdx);
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting default calendar", e);
+        }
+        
+        return calendarId;
     }
 }
