@@ -48,8 +48,18 @@
             android:exported="false"
             android:theme="@style/Theme.TrackED.NoActionBar" />
 
+        <activity
+            android:name=".EditTaskActivity"
+            android:exported="false"
+            android:parentActivityName=".DashboardActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".DashboardActivity" />
+        </activity>
+
     </application>
 </manifest>
+
 
 
 

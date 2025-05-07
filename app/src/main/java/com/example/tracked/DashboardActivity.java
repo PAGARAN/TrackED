@@ -156,8 +156,9 @@ import java.lang.reflect.Method;
 public class DashboardActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "DashboardActivity";
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
-    private static final int ADD_TASK_REQUEST_CODE = 1003;
-    private static final int REQUEST_AUTHORIZATION = 1002;
+    public static final int REQUEST_AUTHORIZATION = 1002;
+    public static final int ADD_TASK_REQUEST_CODE = 1003;
+    public static final int EDIT_TASK_REQUEST_CODE = 1004;
     private static final int RC_SIGN_IN = 9001;
     private static final int AUTO_SCROLL_DELAY = 5000; // 5 seconds
 
@@ -1797,6 +1798,8 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         }
     }
 }
+
+
 
 
 

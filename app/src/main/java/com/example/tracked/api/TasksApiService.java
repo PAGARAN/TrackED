@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class TasksApiService {
     private static final String TAG = "TasksApiService";
@@ -43,6 +44,27 @@ public class TasksApiService {
     public interface TaskListCallback {
         void onSuccess(List<Task> tasks);
         void onFailure(Exception e);
+    }
+
+    // Interface for task update callback
+    public interface TaskUpdateCallback {
+        void onSuccess(Task task);
+        void onFailure(Exception e);
+        void onAuthorizationRequired(Intent intent);
+    }
+    
+    // Interface for task deletion callback
+    public interface TaskDeleteCallback {
+        void onSuccess();
+        void onFailure(Exception e);
+        void onAuthorizationRequired(Intent intent);
+    }
+    
+    // Interface for task search callback
+    public interface TaskSearchCallback {
+        void onSuccess(List<Task> tasks);
+        void onFailure(Exception e);
+        void onAuthorizationRequired(Intent intent);
     }
 
     public TasksApiService(Context context, String accountName) throws Exception {
@@ -236,7 +258,145 @@ public class TasksApiService {
             }
         });
     }
+
+    // Update an existing task
+    public void updateTask(String taskId, String title, String description, String dueDate, String status, TaskUpdateCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
+                // Get task list
+                TaskList defaultList = getOrCreateTaskList();
+                if (defaultList == null) {
+                    throw new IOException("Failed to get or create task list");
+                }
+                
+                // Get the existing task
+                Task existingTask = tasksService.tasks().get(defaultList.getId(), taskId).execute();
+                if (existingTask == null) {
+                    throw new IOException("Task not found");
+                }
+                
+                // Update task fields
+                if (title != null) existingTask.setTitle(title);
+                if (description != null) existingTask.setNotes(description);
+                if (dueDate != null) existingTask.setDue(dueDate);
+                if (status != null) existingTask.setStatus(status);
+                
+                // Update the task
+                Task updatedTask = tasksService.tasks()
+                        .update(defaultList.getId(), taskId, existingTask)
+                        .execute();
+                
+                new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(updatedTask));
+            } catch (UserRecoverableAuthIOException e) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
+            } catch (IOException e) {
+                Log.e(TAG, "Error updating task", e);
+                new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error", e);
+                new Handler(Looper.getMainLooper()).post(() -> 
+                    callback.onFailure(new Exception("Unexpected error: " + e.getMessage())));
+            }
+        });
+    }
+    
+    // Delete a task
+    public void deleteTask(String taskId, TaskDeleteCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
+                // Get task list
+                TaskList defaultList = getOrCreateTaskList();
+                if (defaultList == null) {
+                    throw new IOException("Failed to get or create task list");
+                }
+                
+                // Delete the task
+                tasksService.tasks().delete(defaultList.getId(), taskId).execute();
+                
+                new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess());
+            } catch (UserRecoverableAuthIOException e) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
+            } catch (IOException e) {
+                Log.e(TAG, "Error deleting task", e);
+                new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error", e);
+                new Handler(Looper.getMainLooper()).post(() -> 
+                    callback.onFailure(new Exception("Unexpected error: " + e.getMessage())));
+            }
+        });
+    }
+    
+    // Search for tasks by title or description
+    public void searchTasks(String query, TaskSearchCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
+                // Get task list
+                TaskList defaultList = getOrCreateTaskList();
+                if (defaultList == null) {
+                    throw new IOException("Failed to get or create task list");
+                }
+                
+                // Get all tasks
+                List<Task> tasks = tasksService.tasks()
+                        .list(defaultList.getId())
+                        .execute()
+                        .getItems();
+                
+                if (tasks == null) {
+                    tasks = new ArrayList<>();
+                }
+                
+                // Filter tasks by query
+                String queryLower = query.toLowerCase();
+                List<Task> filteredTasks = tasks.stream()
+                        .filter(task -> 
+                            (task.getTitle() != null && task.getTitle().toLowerCase().contains(queryLower)) ||
+                            (task.getNotes() != null && task.getNotes().toLowerCase().contains(queryLower)))
+                        .collect(Collectors.toList());
+                
+                new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(filteredTasks));
+            } catch (UserRecoverableAuthIOException e) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
+            } catch (IOException e) {
+                Log.e(TAG, "Error searching tasks", e);
+                new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error", e);
+                new Handler(Looper.getMainLooper()).post(() -> 
+                    callback.onFailure(new Exception("Unexpected error: " + e.getMessage())));
+            }
+        });
+    }
+    
+    // Mark a task as completed
+    public void completeTask(String taskId, TaskUpdateCallback callback) {
+        updateTask(taskId, null, null, null, "completed", callback);
+    }
+    
+    // Mark a task as not completed
+    public void uncompleteTask(String taskId, TaskUpdateCallback callback) {
+        updateTask(taskId, null, null, null, "needsAction", callback);
+    }
 }
+
+
+
 
 
 
