@@ -387,12 +387,28 @@ public class AddTaskActivity extends AppCompatActivity {
             @Override
             public void onSuccess(Task task) {
                 // If add to calendar is enabled, create a calendar event
+                boolean calendarSuccess = false;
                 if (addToCalendar && addToCalendarSwitch.isChecked()) {
-                    addTaskToCalendar(title, fullDescription, selectedDueDate);
+                    try {
+                        addTaskToCalendar(title, fullDescription, selectedDueDate);
+                        calendarSuccess = true;
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error adding task to calendar", e);
+                        calendarSuccess = false;
+                    }
                 }
                 
+                final boolean finalCalendarSuccess = calendarSuccess;
                 runOnUiThread(() -> {
-                    Toast.makeText(AddTaskActivity.this, "Task added successfully", Toast.LENGTH_SHORT).show();
+                    if (addToCalendar && addToCalendarSwitch.isChecked() && !finalCalendarSuccess) {
+                        Toast.makeText(AddTaskActivity.this, 
+                            "Task added but failed to add to calendar", 
+                            Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(AddTaskActivity.this, 
+                            "Task added successfully", 
+                            Toast.LENGTH_SHORT).show();
+                    }
                     setResult(RESULT_OK);
                     finish();
                 });
@@ -442,8 +458,10 @@ public class AddTaskActivity extends AppCompatActivity {
     }
 
     private void addTaskToCalendar(String title, String description, String dueDate) {
+        // Double-check calendar permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) 
                 != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "No WRITE_CALENDAR permission, skipping calendar event creation");
             return; // Skip if we don't have permission
         }
         
@@ -471,39 +489,60 @@ public class AddTaskActivity extends AppCompatActivity {
                 
                 // Get default calendar ID
                 long calendarId = getDefaultCalendarId();
+                if (calendarId <= 0) {
+                    Log.e(TAG, "Invalid calendar ID: " + calendarId + ", skipping calendar event creation");
+                    return;
+                }
+                
                 values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
                 values.put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().getID());
                 
                 // Add a reminder (15 minutes before)
                 values.put(CalendarContract.Events.HAS_ALARM, 1);
                 
-                Uri uri = cr.insert(CalendarContract.Events.CONTENT_URI, values);
-                if (uri != null) {
-                    // Add reminder
-                    ContentValues reminderValues = new ContentValues();
-                    reminderValues.put(CalendarContract.Reminders.EVENT_ID, Long.parseLong(uri.getLastPathSegment()));
-                    reminderValues.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT);
-                    reminderValues.put(CalendarContract.Reminders.MINUTES, 15);
-                    cr.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues);
-                    
-                    Log.d(TAG, "Task added to calendar successfully");
+                try {
+                    Uri uri = cr.insert(CalendarContract.Events.CONTENT_URI, values);
+                    if (uri != null) {
+                        // Add reminder
+                        ContentValues reminderValues = new ContentValues();
+                        reminderValues.put(CalendarContract.Reminders.EVENT_ID, Long.parseLong(uri.getLastPathSegment()));
+                        reminderValues.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT);
+                        reminderValues.put(CalendarContract.Reminders.MINUTES, 15);
+                        cr.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues);
+                        
+                        Log.d(TAG, "Task added to calendar successfully");
+                    } else {
+                        Log.e(TAG, "Failed to insert event, uri is null");
+                    }
+                } catch (SecurityException se) {
+                    Log.e(TAG, "Security exception when inserting calendar event", se);
+                } catch (IllegalArgumentException iae) {
+                    Log.e(TAG, "Illegal argument when inserting calendar event", iae);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error inserting calendar event", e);
                 }
+            } else {
+                Log.e(TAG, "Failed to parse due date: " + dueDate);
             }
+        } catch (ParseException pe) {
+            Log.e(TAG, "Error parsing due date: " + dueDate, pe);
         } catch (Exception e) {
             Log.e(TAG, "Error adding task to calendar", e);
         }
     }
 
     private long getDefaultCalendarId() {
-        long calendarId = 1; // Default fallback
+        long calendarId = -1; // Default to -1 to indicate no calendar found
         
+        // Check for calendar permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) 
                 != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "No READ_CALENDAR permission, cannot get default calendar ID");
             return calendarId;
         }
         
         try {
-            // Get the default calendar
+            // First try to get the primary calendar
             String[] projection = new String[]{CalendarContract.Calendars._ID};
             String selection = CalendarContract.Calendars.IS_PRIMARY + "=1";
             Cursor cursor = getContentResolver().query(
@@ -513,15 +552,46 @@ public class AddTaskActivity extends AppCompatActivity {
                     null,
                     null);
             
-            if (cursor != null && cursor.moveToFirst()) {
-                int idIdx = cursor.getColumnIndex(CalendarContract.Calendars._ID);
-                if (idIdx != -1) {
-                    calendarId = cursor.getLong(idIdx);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    int idIdx = cursor.getColumnIndex(CalendarContract.Calendars._ID);
+                    if (idIdx != -1) {
+                        calendarId = cursor.getLong(idIdx);
+                        Log.d(TAG, "Found primary calendar with ID: " + calendarId);
+                    }
                 }
                 cursor.close();
             }
+            
+            // If no primary calendar, try to get any calendar
+            if (calendarId == -1) {
+                Log.d(TAG, "No primary calendar found, looking for any calendar");
+                cursor = getContentResolver().query(
+                        CalendarContract.Calendars.CONTENT_URI,
+                        projection,
+                        null,
+                        null,
+                        null);
+                
+                if (cursor != null) {
+                    if (cursor.moveToFirst()) {
+                        int idIdx = cursor.getColumnIndex(CalendarContract.Calendars._ID);
+                        if (idIdx != -1) {
+                            calendarId = cursor.getLong(idIdx);
+                            Log.d(TAG, "Found calendar with ID: " + calendarId);
+                        }
+                    }
+                    cursor.close();
+                }
+            }
+        } catch (SecurityException se) {
+            Log.e(TAG, "Security exception when querying calendars", se);
         } catch (Exception e) {
             Log.e(TAG, "Error getting default calendar", e);
+        }
+        
+        if (calendarId == -1) {
+            Log.e(TAG, "No calendar found on device");
         }
         
         return calendarId;

@@ -52,6 +52,7 @@ public class CalendarApiService {
     private boolean useGoogleCalendar = false;
     private EventListCallback pendingCallback;
     private String pendingDateString;
+    private static final String TASK_EVENT_PREFIX = "Task: ";
 
     public CalendarApiService(Context context) {
         this.context = context;
@@ -232,14 +233,20 @@ public class CalendarApiService {
                 request.setOrderBy("startTime");
                 request.setSingleEvents(true);
                 
+                // Add a query parameter to filter for task events
+                request.setQ(TASK_EVENT_PREFIX);
+                
                 Events events = request.execute();
                 List<Event> items = events.getItems();
                 
                 List<CalendarEvent> calendarEvents = new ArrayList<>();
                 for (Event event : items) {
-                    CalendarEvent calendarEvent = convertGoogleEventToCalendarEvent(event);
-                    if (calendarEvent != null) {
-                        calendarEvents.add(calendarEvent);
+                    // Only include events that were created by our app
+                    if (event.getSummary() != null && event.getSummary().startsWith(TASK_EVENT_PREFIX)) {
+                        CalendarEvent calendarEvent = convertGoogleEventToCalendarEvent(event);
+                        if (calendarEvent != null) {
+                            calendarEvents.add(calendarEvent);
+                        }
                     }
                 }
                 
@@ -273,6 +280,13 @@ public class CalendarApiService {
                     useGoogleCalendar = false;
                     
                     try {
+                        // Check for calendar read permission
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) 
+                                != PackageManager.PERMISSION_GRANTED) {
+                            callback.onFailure(new SecurityException("READ_CALENDAR permission not granted"));
+                            return;
+                        }
+                        
                         // Parse the date string to get start and end time
                         Date targetDate = apiFormat.parse(dateString);
                         if (targetDate == null) {
@@ -322,6 +336,17 @@ public class CalendarApiService {
             
             if (pendingCallback != null && pendingDateString != null) {
                 try {
+                    // Check for calendar read permission
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) 
+                            != PackageManager.PERMISSION_GRANTED) {
+                        pendingCallback.onFailure(new SecurityException("READ_CALENDAR permission not granted"));
+                        
+                        // Clear pending data
+                        pendingCallback = null;
+                        pendingDateString = null;
+                        return;
+                    }
+                    
                     // Parse the date string to get start and end time
                     Date targetDate = apiFormat.parse(pendingDateString);
                     if (targetDate == null) {
@@ -380,14 +405,21 @@ public class CalendarApiService {
             // Create calendar event
             CalendarEvent calendarEvent = new CalendarEvent();
             calendarEvent.setId(event.getId());
-            calendarEvent.setTitle(title != null ? title : "No Title");
+            
+            // Remove "Task: " prefix if present
+            if (title != null && title.startsWith(TASK_EVENT_PREFIX)) {
+                calendarEvent.setTitle(title.substring(TASK_EVENT_PREFIX.length()));
+            } else {
+                calendarEvent.setTitle(title != null ? title : "No Title");
+            }
+            
             calendarEvent.setDescription(description != null ? description : "");
             calendarEvent.setStartTime(new Date(startDateTime.getValue()));
             calendarEvent.setEndTime(new Date(endDateTime.getValue()));
             calendarEvent.setAllDay(event.getStart().getDate() != null);
             calendarEvent.setColor(event.getColorId() != null ? 
                     Integer.parseInt(event.getColorId()) : 0);
-            calendarEvent.setSource("Google Calendar");
+            calendarEvent.setSource("Task Calendar");
             
             return calendarEvent;
         } catch (Exception e) {
@@ -446,44 +478,55 @@ public class CalendarApiService {
         // Get the content URI
         Uri uri = CalendarContract.Events.CONTENT_URI;
         
-        // Query the calendar
-        Cursor cursor = context.getContentResolver().query(
-                uri,
-                projection,
-                selection,
-                null,
-                CalendarContract.Events.DTSTART + " ASC"
-        );
-        
-        if (cursor != null) {
-            try {
-                // Get column indices
-                int idIdx = cursor.getColumnIndex(CalendarContract.Events._ID);
-                int titleIdx = cursor.getColumnIndex(CalendarContract.Events.TITLE);
-                int descIdx = cursor.getColumnIndex(CalendarContract.Events.DESCRIPTION);
-                int startIdx = cursor.getColumnIndex(CalendarContract.Events.DTSTART);
-                int endIdx = cursor.getColumnIndex(CalendarContract.Events.DTEND);
-                int allDayIdx = cursor.getColumnIndex(CalendarContract.Events.ALL_DAY);
-                int colorIdx = cursor.getColumnIndex(CalendarContract.Events.EVENT_COLOR);
-                
-                // Iterate through results
-                while (cursor.moveToNext()) {
-                    CalendarEvent event = new CalendarEvent();
+        try {
+            // Query the calendar
+            Cursor cursor = context.getContentResolver().query(
+                    uri,
+                    projection,
+                    selection,
+                    null,
+                    CalendarContract.Events.DTSTART + " ASC"
+            );
+            
+            if (cursor != null) {
+                try {
+                    // Get column indices
+                    int idIdx = cursor.getColumnIndex(CalendarContract.Events._ID);
+                    int titleIdx = cursor.getColumnIndex(CalendarContract.Events.TITLE);
+                    int descIdx = cursor.getColumnIndex(CalendarContract.Events.DESCRIPTION);
+                    int startIdx = cursor.getColumnIndex(CalendarContract.Events.DTSTART);
+                    int endIdx = cursor.getColumnIndex(CalendarContract.Events.DTEND);
+                    int allDayIdx = cursor.getColumnIndex(CalendarContract.Events.ALL_DAY);
+                    int colorIdx = cursor.getColumnIndex(CalendarContract.Events.EVENT_COLOR);
                     
-                    if (idIdx != -1) event.setId(cursor.getString(idIdx));
-                    if (titleIdx != -1) event.setTitle(cursor.getString(titleIdx));
-                    if (descIdx != -1) event.setDescription(cursor.getString(descIdx));
-                    if (startIdx != -1) event.setStartTime(new Date(cursor.getLong(startIdx)));
-                    if (endIdx != -1) event.setEndTime(new Date(cursor.getLong(endIdx)));
-                    if (allDayIdx != -1) event.setAllDay(cursor.getInt(allDayIdx) == 1);
-                    if (colorIdx != -1) event.setColor(cursor.getInt(colorIdx));
-                    event.setSource("Device Calendar");
-                    
-                    events.add(event);
+                    // Iterate through results
+                    while (cursor.moveToNext()) {
+                        String title = titleIdx != -1 ? cursor.getString(titleIdx) : "";
+                        
+                        // Only include events that were created by our app (have "Task: " prefix)
+                        if (title != null && title.startsWith(TASK_EVENT_PREFIX)) {
+                            CalendarEvent event = new CalendarEvent();
+                            
+                            if (idIdx != -1) event.setId(cursor.getString(idIdx));
+                            event.setTitle(title.substring(TASK_EVENT_PREFIX.length())); // Remove "Task: " prefix
+                            if (descIdx != -1) event.setDescription(cursor.getString(descIdx));
+                            if (startIdx != -1) event.setStartTime(new Date(cursor.getLong(startIdx)));
+                            if (endIdx != -1) event.setEndTime(new Date(cursor.getLong(endIdx)));
+                            if (allDayIdx != -1) event.setAllDay(cursor.getInt(allDayIdx) == 1);
+                            if (colorIdx != -1) event.setColor(cursor.getInt(colorIdx));
+                            event.setSource("Task Calendar");
+                            
+                            events.add(event);
+                        }
+                    }
+                } finally {
+                    cursor.close();
                 }
-            } finally {
-                cursor.close();
             }
+        } catch (SecurityException e) {
+            Log.e(TAG, "Security exception when querying calendar", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error querying calendar", e);
         }
         
         return events;
@@ -507,6 +550,10 @@ public class CalendarApiService {
         }
     }
 }
+
+
+
+
 
 
 

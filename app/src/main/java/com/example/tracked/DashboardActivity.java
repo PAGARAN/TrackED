@@ -151,6 +151,8 @@ import com.example.tracked.model.NewsResponse;
 import com.example.tracked.adapters.NewsAdapter;
 import com.example.tracked.api.RssFeedService;
 
+import java.lang.reflect.Method;
+
 public class DashboardActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "DashboardActivity";
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -782,6 +784,9 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         
+        Log.d(TAG, "onActivityResult: requestCode=" + requestCode + ", resultCode=" + resultCode);
+        
+        // Handle activity-level results first
         if (requestCode == RC_SIGN_IN) {
             Log.d(TAG, "Sign-in result received");
             com.google.android.gms.tasks.Task<GoogleSignInAccount> task = 
@@ -811,12 +816,30 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         } else if (requestCode == ADD_TASK_REQUEST_CODE && resultCode == RESULT_OK) {
             // Refresh task list when a new task is added
             loadTasks();
-
-            // Also refresh tasks in the TaskListFragment if it's active
-            TaskListFragment taskListFragment = (TaskListFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.fragmentContainer);
-            if (taskListFragment != null) {
-                taskListFragment.refreshTasks();
+            
+            // Check which fragment is currently displayed
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragmentContainer);
+            
+            // Safely check if it's a TaskListFragment before casting
+            if (currentFragment != null && currentFragment.getClass().getName().equals("com.example.tracked.TaskListFragment")) {
+                try {
+                    // Use reflection to call refreshTasks to avoid direct casting
+                    Method refreshMethod = currentFragment.getClass().getMethod("refreshTasks");
+                    refreshMethod.invoke(currentFragment);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error refreshing tasks in fragment", e);
+                }
+            }
+        }
+        
+        // Now pass the result to the current fragment if needed
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragmentContainer);
+        if (currentFragment != null) {
+            try {
+                // Use a separate try-catch block to avoid crashing the whole activity
+                currentFragment.onActivityResult(requestCode, resultCode, data);
+            } catch (Exception e) {
+                Log.e(TAG, "Error passing activity result to fragment", e);
             }
         }
     }
@@ -1774,6 +1797,9 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         }
     }
 }
+
+
+
 
 
 
