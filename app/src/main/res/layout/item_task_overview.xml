@@ -5,36 +5,56 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardCornerRadius="24dp"
+    app:cardCornerRadius="8dp"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="#03A9F4">
+    app:cardBackgroundColor="#FFFFFF">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-        <!-- Task Title -->
-        <TextView
-            android:id="@+id/taskTitle"
-            android:layout_width="match_parent"
+        <View
+            android:id="@+id/taskPriorityIndicator"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="#03A9F4"
+            android:layout_marginEnd="12dp"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"/>
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <!-- Task Due Date (if needed) -->
-        <TextView
-            android:id="@+id/taskDueDate"
+            <!-- Task Title -->
+            <TextView
+                android:id="@+id/taskTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#212121"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <!-- Task Due Date -->
+            <TextView
+                android:id="@+id/taskDueDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#757575"
+                android:textSize="12sp"
+                android:layout_marginTop="4dp"
+                android:drawableStart="@drawable/ic_calendar_small"
+                android:drawablePadding="4dp"/>
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/taskCheckbox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:layout_marginTop="4dp"
-            android:visibility="gone"/>
+            android:layout_gravity="center_vertical"
+            android:buttonTint="#03A9F4"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>
-
-
 

@@ -66,15 +66,6 @@
             android:layout_marginEnd="16dp"/>
 
         <TextView
-            android:id="@+id/buksuNewsButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="BukSU News"
-            android:textColor="#03A9F4"
-            android:textSize="16sp"
-            android:layout_marginEnd="16dp"/>
-
-        <TextView
             android:id="@+id/schoolNewsButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

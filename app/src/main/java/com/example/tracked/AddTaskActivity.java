@@ -16,12 +16,15 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.Calendar;
 import java.text.ParseException;
 
 import com.example.tracked.api.TasksApiService;
@@ -44,6 +47,12 @@ import android.provider.CalendarContract;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import android.content.SharedPreferences;
+import android.app.TimePickerDialog;
+import android.widget.TimePicker;
+import android.text.Editable;
+import android.text.TextWatcher;
+import com.example.tracked.utils.DateTimeUtils;
 
 public class AddTaskActivity extends AppCompatActivity {
     private static final String TAG = "AddTaskActivity";
@@ -70,6 +79,8 @@ public class AddTaskActivity extends AppCompatActivity {
     private String selectedPriority = "Medium"; // Default priority
     private boolean addToCalendar = false;
     private CalendarApiService calendarApiService;
+    private EditText startHourInput, startMinuteInput, dueHourInput, dueMinuteInput;
+    private String selectedStartDateOnly, selectedDueDateOnly;
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -115,6 +126,12 @@ public class AddTaskActivity extends AppCompatActivity {
                 signIn(); // Try to sign in again
                 return;
             }
+            
+            // Save user email to shared preferences for services to use
+            SharedPreferences prefs = getSharedPreferences("TrackedPrefs", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("user_email", email);
+            editor.apply();
             
             Log.d(TAG, "Initializing TasksApiService with email: " + email);
             tasksApiService = new TasksApiService(this, email);
@@ -219,6 +236,28 @@ public class AddTaskActivity extends AppCompatActivity {
         addToCalendarSwitch = findViewById(R.id.addToCalendarSwitch);
         addToCalendarCard = findViewById(R.id.addToCalendarCard);
 
+        // Initialize time input fields
+        startHourInput = findViewById(R.id.startHourInput);
+        startMinuteInput = findViewById(R.id.startMinuteInput);
+        dueHourInput = findViewById(R.id.dueHourInput);
+        dueMinuteInput = findViewById(R.id.dueMinuteInput);
+        
+        // Set default values (current time)
+        Calendar calendar = Calendar.getInstance();
+        int currentHour = calendar.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = calendar.get(Calendar.MINUTE);
+        
+        startHourInput.setText(String.format(Locale.US, "%02d", currentHour));
+        startMinuteInput.setText(String.format(Locale.US, "%02d", currentMinute));
+        dueHourInput.setText(String.format(Locale.US, "%02d", currentHour));
+        dueMinuteInput.setText(String.format(Locale.US, "%02d", currentMinute));
+        
+        // Add text change listeners to validate input
+        startHourInput.addTextChangedListener(new TimeInputValidator(startHourInput, 0, 23));
+        startMinuteInput.addTextChangedListener(new TimeInputValidator(startMinuteInput, 0, 59));
+        dueHourInput.addTextChangedListener(new TimeInputValidator(dueHourInput, 0, 23));
+        dueMinuteInput.addTextChangedListener(new TimeInputValidator(dueMinuteInput, 0, 59));
+
         if (addTaskButton == null) {
             Log.e(TAG, "Failed to find addTaskButton in layout");
             Toast.makeText(this, "Error initializing UI", Toast.LENGTH_SHORT).show();
@@ -321,22 +360,25 @@ public class AddTaskActivity extends AppCompatActivity {
 
         datePicker.addOnPositiveButtonClickListener(selection -> {
             try {
-                // Format the date for Google Tasks API (RFC 3339)
-                SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
-                apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                // Create a Date object from the selection
+                Date selectedDate = new Date(selection);
                 
-                // Format for display
-                SimpleDateFormat displayFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
-                String displayDate = displayFormat.format(new Date(selection));
-
+                // Format for display using our utility class
+                String displayDate = DateTimeUtils.formatToDisplayDate(selectedDate);
+                
+                // Store the selected date (without time)
+                SimpleDateFormat dateOnlyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                
                 if (dateType.equals("start")) {
-                    selectedStartDate = apiFormat.format(new Date(selection));
+                    selectedStartDateOnly = dateOnlyFormat.format(selectedDate);
                     TextView startDateText = findViewById(R.id.startDateText);
                     startDateText.setText(displayDate);
+                    updateStartDateTime();
                 } else {
-                    selectedDueDate = apiFormat.format(new Date(selection));
+                    selectedDueDateOnly = dateOnlyFormat.format(selectedDate);
                     TextView dueDateText = findViewById(R.id.dueDateText);
                     dueDateText.setText(displayDate);
+                    updateDueDateTime();
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error formatting date", e);
@@ -345,6 +387,80 @@ public class AddTaskActivity extends AppCompatActivity {
         });
 
         datePicker.show(getSupportFragmentManager(), "DATE_PICKER_" + dateType.toUpperCase());
+    }
+
+    private void updateStartDateTime() {
+        if (selectedStartDateOnly == null) return;
+        
+        try {
+            int hour = Integer.parseInt(startHourInput.getText().toString());
+            int minute = Integer.parseInt(startMinuteInput.getText().toString());
+            
+            // Combine date and time
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            Date date = dateFormat.parse(selectedStartDateOnly);
+            
+            if (date != null) {
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(date);
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
+                calendar.set(Calendar.MINUTE, minute);
+                calendar.set(Calendar.SECOND, 0);
+                
+                // Format for API using our utility class
+                selectedStartDate = DateTimeUtils.formatToApiDate(calendar.getTime());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating start date and time", e);
+        }
+    }
+
+    private void updateDueDateTime() {
+        if (selectedDueDateOnly == null) return;
+        
+        String hourStr = dueHourInput.getText().toString();
+        String minuteStr = dueMinuteInput.getText().toString();
+        
+        int hour = 0;
+        int minute = 0;
+        
+        if (!hourStr.isEmpty()) {
+            hour = Integer.parseInt(hourStr);
+        }
+        
+        if (!minuteStr.isEmpty()) {
+            minute = Integer.parseInt(minuteStr);
+        }
+        
+        try {
+            // Parse the date part
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            dateFormat.setTimeZone(TimeZone.getTimeZone("Asia/Manila")); // Philippine time
+            Date date = dateFormat.parse(selectedDueDateOnly);
+            
+            if (date != null) {
+                // Set the time part
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(date);
+                calendar.setTimeZone(TimeZone.getTimeZone("Asia/Manila")); // Philippine time
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
+                calendar.set(Calendar.MINUTE, minute);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                
+                // Convert to UTC for API
+                calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+                
+                // Format in API format
+                SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+                apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                selectedDueDate = apiFormat.format(calendar.getTime());
+                
+                Log.d(TAG, "Updated due date/time: " + selectedDueDate);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating due date/time", e);
+        }
     }
 
     private void addTask() {
@@ -361,15 +477,26 @@ public class AddTaskActivity extends AppCompatActivity {
             return;
         }
 
-        if (selectedStartDate == null) {
+        // Validate time inputs
+        if (startHourInput.getError() != null || startMinuteInput.getError() != null ||
+            dueHourInput.getError() != null || dueMinuteInput.getError() != null) {
+            Toast.makeText(this, "Please correct the time input errors", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (selectedStartDateOnly == null) {
             Toast.makeText(this, "Please select a start date", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (selectedDueDate == null) {
+        if (selectedDueDateOnly == null) {
             Toast.makeText(this, "Please select a due date", Toast.LENGTH_SHORT).show();
             return;
         }
+        
+        // Update date and time combinations
+        updateStartDateTime();
+        updateDueDateTime();
 
         // Include priority in description
         String fullDescription = "Type: " + (selectedTaskType != null ? selectedTaskType : "Not specified") + 
@@ -422,6 +549,7 @@ public class AddTaskActivity extends AppCompatActivity {
                     Toast.makeText(AddTaskActivity.this, 
                         "Error adding task: " + e.getMessage(), 
                         Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error adding task", e);
                 });
             }
 
@@ -466,7 +594,7 @@ public class AddTaskActivity extends AppCompatActivity {
         }
         
         try {
-            // Parse due date
+            // Parse due date with time
             SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
             apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
             Date date = apiFormat.parse(dueDate);
@@ -479,7 +607,7 @@ public class AddTaskActivity extends AppCompatActivity {
                 values.put(CalendarContract.Events.TITLE, "Task: " + title);
                 values.put(CalendarContract.Events.DESCRIPTION, description);
                 
-                // Set start time to due date
+                // Set start time to due date with time
                 long startMillis = date.getTime();
                 values.put(CalendarContract.Events.DTSTART, startMillis);
                 
@@ -595,5 +723,46 @@ public class AddTaskActivity extends AppCompatActivity {
         }
         
         return calendarId;
+    }
+
+    private class TimeInputValidator implements TextWatcher {
+        private final EditText editText;
+        private final int minValue;
+        private final int maxValue;
+        
+        public TimeInputValidator(EditText editText, int minValue, int maxValue) {
+            this.editText = editText;
+            this.minValue = minValue;
+            this.maxValue = maxValue;
+        }
+        
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+        
+        @Override
+        public void afterTextChanged(Editable s) {
+            try {
+                String text = s.toString();
+                if (!text.isEmpty()) {
+                    int value = Integer.parseInt(text);
+                    if (value < minValue || value > maxValue) {
+                        editText.setError("Value must be between " + minValue + " and " + maxValue);
+                    } else {
+                        editText.setError(null);
+                        // Update the combined date and time
+                        if (editText == startHourInput || editText == startMinuteInput) {
+                            updateStartDateTime();
+                        } else if (editText == dueHourInput || editText == dueMinuteInput) {
+                            updateDueDateTime();
+                        }
+                    }
+                }
+            } catch (NumberFormatException e) {
+                editText.setError("Invalid number");
+            }
+        }
     }
 }

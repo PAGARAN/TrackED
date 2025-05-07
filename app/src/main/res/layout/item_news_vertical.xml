@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="16dp"
     app:cardCornerRadius="12dp"
-    app:cardBackgroundColor="#FFFFFF"
+    app:cardBackgroundColor="#FFFFFF" 
     app:cardElevation="2dp">
 
     <RelativeLayout
@@ -48,3 +48,4 @@
             android:ellipsize="end"/>
     </RelativeLayout>
 </androidx.cardview.widget.CardView>
+

@@ -6,6 +6,8 @@ public class NewsArticle {
     private String url;
     private String urlToImage;
     private String publishedAt;
+    private String content;
+    private String sourceName;
 
     public String getTitle() { return title; }
     public String getDescription() { return description; }
@@ -18,4 +20,12 @@ public class NewsArticle {
     public void setUrl(String url) { this.url = url; }
     public void setUrlToImage(String urlToImage) { this.urlToImage = urlToImage; }
     public void setPublishedAt(String publishedAt) { this.publishedAt = publishedAt; }
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
+    }
 }
+

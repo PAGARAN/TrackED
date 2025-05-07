@@ -198,12 +198,38 @@ public class RssFeedService {
         private String extractImageFromContent(String content) {
             if (content == null) return null;
             
-            // Simple regex to find image URL in HTML content
-            Pattern pattern = Pattern.compile("<img[^>]+src\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>");
-            Matcher matcher = pattern.matcher(content);
-            if (matcher.find()) {
-                return matcher.group(1);
+            // More robust regex to find image URL in HTML content
+            try {
+                // First try to find img tags
+                Pattern pattern = Pattern.compile("<img[^>]+src\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>");
+                Matcher matcher = pattern.matcher(content);
+                if (matcher.find()) {
+                    String imageUrl = matcher.group(1);
+                    Log.d(TAG, "Found image in content: " + imageUrl);
+                    return imageUrl;
+                }
+                
+                // If no img tag, try to find background images
+                pattern = Pattern.compile("background(-image)?\\s*:\\s*url\\(['\"]?([^'\"\\)]+)['\"]?\\)");
+                matcher = pattern.matcher(content);
+                if (matcher.find()) {
+                    String imageUrl = matcher.group(2);
+                    Log.d(TAG, "Found background image in content: " + imageUrl);
+                    return imageUrl;
+                }
+                
+                // If still no image, try to find any URL that looks like an image
+                pattern = Pattern.compile("https?://[^\\s]+\\.(jpg|jpeg|png|gif|webp)[^\\s]*");
+                matcher = pattern.matcher(content);
+                if (matcher.find()) {
+                    String imageUrl = matcher.group(0);
+                    Log.d(TAG, "Found image URL in content: " + imageUrl);
+                    return imageUrl;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error extracting image from content", e);
             }
+            
             return null;
         }
 
@@ -217,3 +243,5 @@ public class RssFeedService {
         }
     }
 }
+
+

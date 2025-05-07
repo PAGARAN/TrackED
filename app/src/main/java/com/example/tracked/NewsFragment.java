@@ -70,13 +70,8 @@ public class NewsFragment extends Fragment {
         });
 
         // Set up news category buttons
-        TextView buksuNewsButton = view.findViewById(R.id.buksuNewsButton);
         TextView schoolNewsButton = view.findViewById(R.id.schoolNewsButton);
         TextView educationNewsButton = view.findViewById(R.id.educationNewsButton);
-        
-        buksuNewsButton.setOnClickListener(v -> {
-            fetchBuksuNews();
-        });
         
         schoolNewsButton.setOnClickListener(v -> {
             showSchoolSelectionDialog();

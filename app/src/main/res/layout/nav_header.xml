@@ -15,6 +15,15 @@
         android:src="@drawable/tracked_logo" />
 
     <TextView
+        android:id="@+id/userName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
         android:id="@+id/userEmail"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -22,6 +31,7 @@
         android:textSize="14sp"/>
 
 </LinearLayout>
+
 
 
 

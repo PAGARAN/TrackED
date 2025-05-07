@@ -266,6 +266,61 @@
                             android:src="@drawable/ic_dropdown"
                             android:contentDescription="Select date" />
                     </LinearLayout>
+                    
+                    <!-- Add Time Input Section -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:layout_marginBottom="16dp"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_time"
+                            android:tint="#03A9F4"
+                            android:contentDescription="Start time" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:layout_marginStart="16dp">
+
+                            <EditText
+                                android:id="@+id/startHourInput"
+                                android:layout_width="48dp"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLength="2"
+                                android:hint="HH"
+                                android:textSize="16sp"
+                                android:textAlignment="center" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text=":"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:layout_marginHorizontal="4dp" />
+
+                            <EditText
+                                android:id="@+id/startMinuteInput"
+                                android:layout_width="48dp"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLength="2"
+                                android:hint="MM"
+                                android:textSize="16sp"
+                                android:textAlignment="center" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -289,8 +344,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Due Date"
-                        android:textColor="#03A9F4"
-                        android:textSize="14sp"
+                        android:textColor="@android:color/black"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <LinearLayout
@@ -322,6 +377,58 @@
                             android:layout_height="24dp"
                             android:src="@drawable/ic_dropdown"
                             android:contentDescription="Select date" />
+                    </LinearLayout>
+                    
+                    <!-- Time Input Section -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_time"
+                            android:tint="#03A9F4"
+                            android:contentDescription="Due time" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:layout_marginStart="16dp">
+
+                            <EditText
+                                android:id="@+id/dueHourInput"
+                                android:layout_width="48dp"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLength="2"
+                                android:hint="HH"
+                                android:textSize="16sp"
+                                android:textAlignment="center" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text=":"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:layout_marginHorizontal="4dp" />
+
+                            <EditText
+                                android:id="@+id/dueMinuteInput"
+                                android:layout_width="48dp"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLength="2"
+                                android:hint="MM"
+                                android:textSize="16sp"
+                                android:textAlignment="center" />
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

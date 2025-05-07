@@ -11,20 +11,15 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.api.services.tasks.model.Task;
+import com.example.tracked.utils.DateTimeUtils;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.TaskViewHolder> {
     private List<Task> tasks = new ArrayList<>();
-    private SimpleDateFormat displayFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
-    private SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
     private TaskActionListener taskActionListener;
     
     // Interface for task actions
@@ -33,6 +28,7 @@ public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.Ta
         void onDeleteTask(Task task);
         void onCompleteTask(Task task);
         void onUncompleteTask(Task task);
+        void onViewTask(Task task); // Add this method to the interface
     }
     
     public void setTaskActionListener(TaskActionListener listener) {
@@ -72,6 +68,7 @@ public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.Ta
         ImageButton editButton;
         ImageButton deleteButton;
         ImageButton completeButton;
+        View taskContainer; // Add this to reference the clickable container
 
         TaskViewHolder(View itemView) {
             super(itemView);
@@ -83,6 +80,7 @@ public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.Ta
             editButton = itemView.findViewById(R.id.editTaskButton);
             deleteButton = itemView.findViewById(R.id.deleteTaskButton);
             completeButton = itemView.findViewById(R.id.completeTaskButton);
+            taskContainer = itemView.findViewById(R.id.taskContainer); // Get reference to the container
         }
 
         void bind(Task task) {
@@ -162,28 +160,16 @@ public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.Ta
             
             // Format and set due date
             if (task.getDue() != null && !task.getDue().isEmpty()) {
-                try {
-                    Date date = apiFormat.parse(task.getDue());
-                    dateView.setText(displayFormat.format(date));
-                    dateView.setVisibility(View.VISIBLE);
-                } catch (ParseException e) {
-                    dateView.setText(task.getDue());
-                    dateView.setVisibility(View.VISIBLE);
-                }
+                dateView.setText(DateTimeUtils.apiDateToDisplayDateTime(task.getDue()));
+                dateView.setVisibility(View.VISIBLE);
             } else {
                 dateView.setVisibility(View.GONE);
             }
             
             // Format and set start date
             if (startDate != null && !startDate.isEmpty()) {
-                try {
-                    Date date = apiFormat.parse(startDate);
-                    startDateView.setText(displayFormat.format(date));
-                    startDateView.setVisibility(View.VISIBLE);
-                } catch (ParseException e) {
-                    startDateView.setText(startDate);
-                    startDateView.setVisibility(View.VISIBLE);
-                }
+                startDateView.setText(DateTimeUtils.apiDateToDisplayDateTime(startDate));
+                startDateView.setVisibility(View.VISIBLE);
             } else {
                 startDateView.setVisibility(View.GONE);
             }
@@ -215,9 +201,18 @@ public class TaskDetailAdapter extends RecyclerView.Adapter<TaskDetailAdapter.Ta
                     }
                 }
             });
+            
+            // Add click listener to the entire task item
+            itemView.setOnClickListener(v -> {
+                if (taskActionListener != null) {
+                    taskActionListener.onViewTask(task);
+                }
+            });
         }
     }
 }
+
+
 
 
 

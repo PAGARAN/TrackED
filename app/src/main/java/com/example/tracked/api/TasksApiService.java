@@ -44,6 +44,7 @@ public class TasksApiService {
     public interface TaskListCallback {
         void onSuccess(List<Task> tasks);
         void onFailure(Exception e);
+        void onAuthorizationRequired(Intent intent);
     }
 
     // Interface for task update callback
@@ -140,6 +141,9 @@ public class TasksApiService {
                     throw new IOException("Failed to get or create task list");
                 }
 
+                // Log task details for debugging
+                Log.d(TAG, "Adding task - Title: " + title + ", Due: " + dueDate);
+
                 // Create new task
                 Task task = new Task()
                         .setTitle(title)
@@ -151,9 +155,12 @@ public class TasksApiService {
                 Task createdTask = tasksService.tasks()
                         .insert(defaultList.getId(), task)
                         .execute();
+                
+                Log.d(TAG, "Task added successfully with ID: " + createdTask.getId());
 
                 new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(createdTask));
             } catch (UserRecoverableAuthIOException e) {
+                Log.e(TAG, "Authorization required", e);
                 new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
             } catch (IOException e) {
                 Log.e(TAG, "Error adding task", e);
@@ -174,7 +181,8 @@ public class TasksApiService {
             }
             
             // Log the account name being used
-            Log.d(TAG, "Getting task list for account: " + credential.getSelectedAccountName());
+            String userEmail = credential.getSelectedAccountName();
+            Log.d(TAG, "Getting task list for account: " + userEmail);
             
             // Get all task lists
             com.google.api.services.tasks.model.TaskLists taskLists = tasksService.tasklists().list().execute();
@@ -183,21 +191,24 @@ public class TasksApiService {
             if (taskLists == null || taskLists.getItems() == null) {
                 Log.d(TAG, "No task lists found, creating a new one");
                 TaskList newList = new TaskList();
-                newList.setTitle("TrackED");
+                newList.setTitle("TrackED-" + userEmail);
                 return tasksService.tasklists().insert(newList).execute();
             }
             
-            // Look for the TrackED task list
+            // Create a user-specific task list name
+            String userTaskListName = "TrackED-" + userEmail;
+            
+            // Look for the user-specific TrackED task list
             TaskList taskList = taskLists.getItems()
                 .stream()
-                .filter(list -> "TrackED".equals(list.getTitle()))
+                .filter(list -> userTaskListName.equals(list.getTitle()))
                 .findFirst()
                 .orElse(null);
 
             if (taskList == null) {
-                Log.d(TAG, "TrackED task list not found, creating a new one");
+                Log.d(TAG, "User-specific task list not found, creating a new one: " + userTaskListName);
                 TaskList newList = new TaskList();
-                newList.setTitle("TrackED");
+                newList.setTitle(userTaskListName);
                 taskList = tasksService.tasklists().insert(newList).execute();
             }
 
@@ -393,7 +404,61 @@ public class TasksApiService {
     public void uncompleteTask(String taskId, TaskUpdateCallback callback) {
         updateTask(taskId, null, null, null, "needsAction", callback);
     }
+
+    /**
+     * Get tasks due on a specific date
+     * @param date Date in format YYYY-MM-DD
+     * @param callback Callback to handle the result
+     */
+    public void getTasksDueOn(String date, final TaskListCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Verify credential is still valid
+                if (credential == null || credential.getSelectedAccountName() == null) {
+                    throw new IOException("Invalid credential. Please sign in again.");
+                }
+                
+                // Get task list
+                TaskList defaultList = getOrCreateTaskList();
+                if (defaultList == null) {
+                    throw new IOException("Failed to get or create task list");
+                }
+                
+                // Get all tasks
+                Tasks.TasksOperations.List request = tasksService.tasks().list(defaultList.getId());
+                com.google.api.services.tasks.model.Tasks tasks = request.execute();
+                
+                if (tasks.getItems() == null) {
+                    new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(new ArrayList<>()));
+                    return;
+                }
+                
+                // Filter tasks due on the specified date
+                List<Task> tasksForDate = new ArrayList<>();
+                for (Task task : tasks.getItems()) {
+                    if (task.getDue() != null && task.getDue().startsWith(date)) {
+                        tasksForDate.add(task);
+                    }
+                }
+                
+                new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(tasksForDate));
+            } catch (UserRecoverableAuthIOException e) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
+            } catch (IOException e) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
+            } catch (Exception e) {
+                new Handler(Looper.getMainLooper()).post(() -> 
+                    callback.onFailure(new Exception("Unexpected error: " + e.getMessage())));
+            }
+        });
+    }
 }
+
+
+
+
+
+
 
 
 
