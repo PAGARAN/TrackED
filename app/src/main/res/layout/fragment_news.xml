@@ -37,11 +37,7 @@
             android:textColor="@android:color/black"
             android:textSize="20sp"
             android:textStyle="bold"/>
-            
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="24dp"
-            android:src="@drawable/tracked_logo"/>
+
     </LinearLayout>
 
     <!-- News Category Buttons -->
@@ -94,9 +90,11 @@
             android:id="@+id/newsRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="16dp"
             android:clipToPadding="false"
             android:visibility="gone"/>
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+

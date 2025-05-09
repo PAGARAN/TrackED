@@ -53,6 +53,7 @@ public class CalendarApiService {
     private EventListCallback pendingCallback;
     private String pendingDateString;
     private static final String TASK_EVENT_PREFIX = "Task: ";
+    private static final boolean TASK_EVENT_PREFIX_FILTER_ONLY = false;
 
     public CalendarApiService(Context context) {
         this.context = context;
@@ -152,6 +153,13 @@ public class CalendarApiService {
                 
                 // Query events with the date selection
                 List<CalendarEvent> events = queryCalendarEvents(selection);
+                
+                // Log the events found for debugging
+                Log.d(TAG, "Found " + events.size() + " events for date: " + date);
+                for (CalendarEvent event : events) {
+                    Log.d(TAG, "Event: " + event.getTitle() + ", Start: " + event.getStartTime());
+                }
+                
                 callback.onSuccess(events);
             } catch (Exception e) {
                 Log.e(TAG, "Error getting calendar events for date", e);
@@ -459,12 +467,12 @@ public class CalendarApiService {
         // Check for calendar read permission
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) 
                 != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "No READ_CALENDAR permission");
+            Log.e(TAG, "READ_CALENDAR permission not granted");
             return events;
         }
         
         // Define the projection (columns to fetch)
-        String[] projection = new String[]{
+        String[] projection = new String[] {
                 CalendarContract.Events._ID,
                 CalendarContract.Events.TITLE,
                 CalendarContract.Events.DESCRIPTION,
@@ -499,16 +507,29 @@ public class CalendarApiService {
                     int allDayIdx = cursor.getColumnIndex(CalendarContract.Events.ALL_DAY);
                     int colorIdx = cursor.getColumnIndex(CalendarContract.Events.EVENT_COLOR);
                     
+                    Log.d(TAG, "Found " + cursor.getCount() + " calendar events");
+                    
                     // Iterate through results
                     while (cursor.moveToNext()) {
-                        String title = titleIdx != -1 ? cursor.getString(titleIdx) : "";
+                        String title = cursor.getString(titleIdx);
                         
-                        // Only include events that were created by our app (have "Task: " prefix)
-                        if (title != null && title.startsWith(TASK_EVENT_PREFIX)) {
+                        // Log each event for debugging
+                        Log.d(TAG, "Calendar event: " + title);
+                        
+                        // Include all events that were created by our app (have "Task: " prefix)
+                        // or include all events if we want to show everything
+                        if (title != null && (title.startsWith(TASK_EVENT_PREFIX) || !TASK_EVENT_PREFIX_FILTER_ONLY)) {
                             CalendarEvent event = new CalendarEvent();
                             
                             if (idIdx != -1) event.setId(cursor.getString(idIdx));
-                            event.setTitle(title.substring(TASK_EVENT_PREFIX.length())); // Remove "Task: " prefix
+                            
+                            // Remove "Task: " prefix if present
+                            if (title != null && title.startsWith(TASK_EVENT_PREFIX)) {
+                                event.setTitle(title.substring(TASK_EVENT_PREFIX.length()));
+                            } else {
+                                event.setTitle(title != null ? title : "No Title");
+                            }
+                            
                             if (descIdx != -1) event.setDescription(cursor.getString(descIdx));
                             if (startIdx != -1) event.setStartTime(new Date(cursor.getLong(startIdx)));
                             if (endIdx != -1) event.setEndTime(new Date(cursor.getLong(endIdx)));
@@ -523,10 +544,8 @@ public class CalendarApiService {
                     cursor.close();
                 }
             }
-        } catch (SecurityException e) {
-            Log.e(TAG, "Security exception when querying calendar", e);
         } catch (Exception e) {
-            Log.e(TAG, "Error querying calendar", e);
+            Log.e(TAG, "Error querying calendar events", e);
         }
         
         return events;
@@ -550,6 +569,7 @@ public class CalendarApiService {
         }
     }
 }
+
 
 
 

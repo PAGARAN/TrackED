@@ -49,10 +49,6 @@
                         android:textSize="20sp"
                         android:textStyle="bold"/>
 
-                    <ImageView
-                        android:layout_width="80dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/tracked_logo"/>
                 </LinearLayout>
 
                 <!-- News Category Buttons -->
@@ -85,7 +81,7 @@
                 <!-- News Card -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
-                    android:layout_height="150dp"
+                    android:layout_height="220dp"
                     android:layout_marginTop="16dp"
                     app:cardCornerRadius="24dp"
                     app:cardBackgroundColor="#E3F2FD"
@@ -93,7 +89,7 @@
 
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent">
+                        android:layout_height="245dp">
 
                         <ProgressBar
                             android:id="@+id/newsProgress"
@@ -261,7 +257,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Today's Tasks"
+                    android:text="Tasks List"
                     android:textColor="@android:color/black"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -270,7 +266,6 @@
                     android:id="@+id/viewAllTasks"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="View All"
                     android:textColor="#03A9F4"
                     android:textSize="14sp"
                     android:padding="4dp"/>

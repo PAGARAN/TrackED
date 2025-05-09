@@ -87,6 +87,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
@@ -1802,7 +1804,8 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
 
     // Add this method to set up the tasks section with thumbnail layout
     private void setupTodaysTasks() {
-        RecyclerView tasksRecyclerView = findViewById(R.id.tasksRecyclerView);
+        tasksRecyclerView = findViewById(R.id.tasksRecyclerView);
+        emptyTasksView = findViewById(R.id.emptyTasksView);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(
                 this, LinearLayoutManager.HORIZONTAL, false);
@@ -1811,6 +1814,15 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         // Assign to the class-level taskAdapter variable instead of creating a local variable
         taskAdapter = new TaskAdapter(R.layout.item_task_thumbnail);
         tasksRecyclerView.setAdapter(taskAdapter);
+
+        // Add spacing between items
+        int spacingInPixels = getResources().getDimensionPixelSize(R.dimen.task_spacing);
+        tasksRecyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
+            @Override
+            public void getItemOffsets(Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
+                outRect.right = spacingInPixels;
+            }
+        });
 
         taskAdapter.setTaskClickListener(task -> {
             Intent intent = new Intent(this, ViewTaskActivity.class);
@@ -1822,6 +1834,10 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             startActivity(intent);
         });
 
+        // Find the section title - use the existing TextView that's already in the layout
+        // The title is likely already set in the XML layout, so we don't need to set it here
+        
+        // Load today's tasks
         loadTodaysTasks(taskAdapter);
     }
 
@@ -1839,6 +1855,8 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         String today = apiFormat.format(new Date());
         
+        Log.d(TAG, "Loading tasks for today: " + today);
+        
         // Add null check for adapter
         if (adapter == null) {
             Log.e(TAG, "TaskAdapter is null, cannot load today's tasks");
@@ -1849,14 +1867,44 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             @Override
             public void onSuccess(List<Task> taskList) {
                 runOnUiThread(() -> {
+                    Log.d(TAG, "Received " + taskList.size() + " tasks for today");
+                    
+                    // Log each task for debugging
+                    for (Task task : taskList) {
+                        Log.d(TAG, "Today's task: " + task.getTitle());
+                        
+                        // Check if it's due today
+                        if (task.getDue() != null && task.getDue().startsWith(today)) {
+                            Log.d(TAG, "  - Due today: " + task.getDue());
+                        }
+                        
+                        // Check if it starts today
+                        if (task.getNotes() != null) {
+                            Pattern startDatePattern = Pattern.compile("Start Date:\\s*([^\\n]+)");
+                            Matcher startDateMatcher = startDatePattern.matcher(task.getNotes());
+                            if (startDateMatcher.find()) {
+                                String startDate = startDateMatcher.group(1).trim();
+                                if (startDate.startsWith(today)) {
+                                    Log.d(TAG, "  - Starts today: " + startDate);
+                                }
+                            }
+                        }
+                    }
+                    
                     if (taskList.isEmpty()) {
                         if (emptyTasksView != null) {
                             emptyTasksView.setVisibility(View.VISIBLE);
                             emptyTasksView.setText("No tasks for today");
                         }
+                        if (tasksRecyclerView != null) {
+                            tasksRecyclerView.setVisibility(View.GONE);
+                        }
                     } else {
                         if (emptyTasksView != null) {
                             emptyTasksView.setVisibility(View.GONE);
+                        }
+                        if (tasksRecyclerView != null) {
+                            tasksRecyclerView.setVisibility(View.VISIBLE);
                         }
                         adapter.setTasks(taskList);
                     }
@@ -1866,9 +1914,13 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
             @Override
             public void onFailure(Exception e) {
                 runOnUiThread(() -> {
+                    Log.e(TAG, "Failed to load today's tasks", e);
                     if (emptyTasksView != null) {
                         emptyTasksView.setVisibility(View.VISIBLE);
                         emptyTasksView.setText("Error loading tasks: " + e.getMessage());
+                    }
+                    if (tasksRecyclerView != null) {
+                        tasksRecyclerView.setVisibility(View.GONE);
                     }
                 });
             }
@@ -1880,7 +1932,5 @@ public class DashboardActivity extends AppCompatActivity implements NavigationVi
         });
     }
 }
-
-
 
 

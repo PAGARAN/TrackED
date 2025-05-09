@@ -25,9 +25,25 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
     private static final String TAG = "NewsAdapter";
     private List<NewsArticle> newsArticles = new ArrayList<>();
     private Context context;
+    private boolean isVerticalLayout = true;
+    private boolean isFullWidth = false;
 
     public NewsAdapter(Context context) {
         this.context = context;
+        this.newsArticles = new ArrayList<>();
+    }
+
+    public NewsAdapter(Context context, boolean isVerticalLayout) {
+        this.context = context;
+        this.newsArticles = new ArrayList<>();
+        this.isVerticalLayout = isVerticalLayout;
+    }
+
+    public NewsAdapter(Context context, boolean isVerticalLayout, boolean isFullWidth) {
+        this.context = context;
+        this.newsArticles = new ArrayList<>();
+        this.isVerticalLayout = isVerticalLayout;
+        this.isFullWidth = isFullWidth;
     }
 
     public void setNewsArticles(List<NewsArticle> newsArticles) {
@@ -64,8 +80,17 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
         // Log the layout inflation to help debug
         Log.d(TAG, "Creating new ViewHolder");
         
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_news, parent, false);
+        View view;
+        if (isFullWidth) {
+            view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_news_fullwidth, parent, false);
+        } else if (isVerticalLayout) {
+            view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_news_vertical, parent, false);
+        } else {
+            view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_news, parent, false);
+        }
         return new NewsViewHolder(view);
     }
 
@@ -147,6 +172,8 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
                 
                 holder.newsSource.setText(source);
                 holder.newsSource.setVisibility(View.VISIBLE);
+            } else {
+                Log.e(TAG, "newsSource view is null");
             }
             
             // Set click listener
@@ -198,6 +225,12 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
         }
     }
 }
+
+
+
+
+
+
 
 
 

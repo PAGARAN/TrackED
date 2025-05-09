@@ -144,7 +144,8 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             holder.completionIndicator.setVisibility(isCompleted ? View.VISIBLE : View.GONE);
         }
         
-        // Set priority indicator color (for overview layout)
+        // Remove priority indicator handling
+        /*
         if (holder.priorityIndicator != null) {
             // Default to blue
             int color = Color.parseColor("#03A9F4");
@@ -163,6 +164,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             
             holder.priorityIndicator.setBackgroundColor(color);
         }
+        */
         
         // Set click listener for the entire item
         holder.itemView.setOnClickListener(v -> {
@@ -183,7 +185,8 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         TextView dueDateView;
         TextView typeView;
         CheckBox checkBox;
-        View priorityIndicator;
+        // Remove priority indicator
+        // View priorityIndicator;
         View typeIndicator;
         ImageView completionIndicator;
 
@@ -197,12 +200,15 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             descriptionView = itemView.findViewById(R.id.taskDescription);
             typeView = itemView.findViewById(R.id.taskType);
             checkBox = itemView.findViewById(R.id.taskCheckbox);
-            priorityIndicator = itemView.findViewById(R.id.taskPriorityIndicator);
+            // Remove priority indicator
+            // priorityIndicator = itemView.findViewById(R.id.taskPriorityIndicator);
             typeIndicator = itemView.findViewById(R.id.taskTypeIndicator);
             completionIndicator = itemView.findViewById(R.id.taskCompletionIndicator);
         }
     }
 }
+
+
 
 
 

@@ -378,7 +378,7 @@
                             android:src="@drawable/ic_dropdown"
                             android:contentDescription="Select date" />
                     </LinearLayout>
-                    
+
                     <!-- Time Input Section -->
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -502,60 +502,8 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Priority"
-                        android:textColor="#03A9F4"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginTop="12dp">
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/lowPriorityChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Low"
-                            app:chipBackgroundColor="#E0F7FA"
-                            app:chipStrokeColor="#B2EBF2"
-                            app:chipStrokeWidth="1dp"
-                            android:textColor="#00ACC1"
-                            android:layout_marginEnd="8dp" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/mediumPriorityChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Medium"
-                            app:chipBackgroundColor="#FFF8E1"
-                            app:chipStrokeColor="#FFECB3"
-                            app:chipStrokeWidth="1dp"
-                            android:textColor="#FFA000"
-                            android:layout_marginEnd="8dp" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/highPriorityChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="High"
-                            app:chipBackgroundColor="#FFEBEE"
-                            app:chipStrokeColor="#FFCDD2"
-                            app:chipStrokeWidth="1dp"
-                            android:textColor="#E53935" />
-                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- Spacer for bottom button -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="80dp" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

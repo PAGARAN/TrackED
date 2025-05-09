@@ -53,6 +53,8 @@ import android.widget.TimePicker;
 import android.text.Editable;
 import android.text.TextWatcher;
 import com.example.tracked.utils.DateTimeUtils;
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.DateValidatorPointForward;
 
 public class AddTaskActivity extends AppCompatActivity {
     private static final String TAG = "AddTaskActivity";
@@ -75,8 +77,9 @@ public class AddTaskActivity extends AppCompatActivity {
     private EditText descriptionInput;
     private MaterialButton addTaskButton;
     private com.google.android.material.switchmaterial.SwitchMaterial addToCalendarSwitch;
-    private com.google.android.material.chip.Chip lowPriorityChip, mediumPriorityChip, highPriorityChip;
-    private String selectedPriority = "Medium"; // Default priority
+    // Remove these priority-related field declarations
+    // private com.google.android.material.chip.Chip lowPriorityChip, mediumPriorityChip, highPriorityChip;
+    // private String selectedPriority = "Medium"; // Default priority
     private boolean addToCalendar = false;
     private CalendarApiService calendarApiService;
     private EditText startHourInput, startMinuteInput, dueHourInput, dueMinuteInput;
@@ -91,7 +94,7 @@ public class AddTaskActivity extends AppCompatActivity {
         // Initialize views and other setup
         initializeViews();
         setupTaskTypeDropdown();
-        setupPriorityChips();
+        // setupPriorityChips();
 
         // Configure Google Sign In with explicit Tasks scope
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -227,11 +230,6 @@ public class AddTaskActivity extends AppCompatActivity {
         ImageButton backButton = findViewById(R.id.backButton);
         ImageButton saveButton = findViewById(R.id.saveButton);
 
-        // Initialize priority chips
-        lowPriorityChip = findViewById(R.id.lowPriorityChip);
-        mediumPriorityChip = findViewById(R.id.mediumPriorityChip);
-        highPriorityChip = findViewById(R.id.highPriorityChip);
-
         // Initialize calendar switch
         addToCalendarSwitch = findViewById(R.id.addToCalendarSwitch);
         addToCalendarCard = findViewById(R.id.addToCalendarCard);
@@ -325,37 +323,23 @@ public class AddTaskActivity extends AppCompatActivity {
         });
     }
 
-    private void setupPriorityChips() {
-        // Set medium as default selected
-        mediumPriorityChip.setChecked(true);
-        
-        // Set up click listeners
-        lowPriorityChip.setOnClickListener(v -> {
-            lowPriorityChip.setChecked(true);
-            mediumPriorityChip.setChecked(false);
-            highPriorityChip.setChecked(false);
-            selectedPriority = "Low";
-        });
-        
-        mediumPriorityChip.setOnClickListener(v -> {
-            lowPriorityChip.setChecked(false);
-            mediumPriorityChip.setChecked(true);
-            highPriorityChip.setChecked(false);
-            selectedPriority = "Medium";
-        });
-        
-        highPriorityChip.setOnClickListener(v -> {
-            lowPriorityChip.setChecked(false);
-            mediumPriorityChip.setChecked(false);
-            highPriorityChip.setChecked(true);
-            selectedPriority = "High";
-        });
-    }
+    // setupPriorityChips method removed
 
     private void showDatePicker(String dateType) {
+        // Get today's date in milliseconds for minimum date constraint
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        long todayInMillis = calendar.getTimeInMillis();
+        
         MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
                 .setTitleText(dateType.equals("start") ? "Select start date" : "Select due date")
                 .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
+                .setCalendarConstraints(new CalendarConstraints.Builder()
+                    .setValidator(DateValidatorPointForward.from(todayInMillis))
+                    .build())
                 .build();
 
         datePicker.addOnPositiveButtonClickListener(selection -> {
@@ -497,10 +481,36 @@ public class AddTaskActivity extends AppCompatActivity {
         // Update date and time combinations
         updateStartDateTime();
         updateDueDateTime();
+        
+        // Check if start date or due date has already passed
+        try {
+            Date currentDate = new Date();
+            
+            // Parse the dates for comparison
+            SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            
+            if (selectedStartDate != null) {
+                Date startDate = apiFormat.parse(selectedStartDate);
+                if (startDate != null && startDate.before(currentDate)) {
+                    Toast.makeText(this, "Start date cannot be in the past", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            
+            if (selectedDueDate != null) {
+                Date dueDate = apiFormat.parse(selectedDueDate);
+                if (dueDate != null && dueDate.before(currentDate)) {
+                    Toast.makeText(this, "Due date cannot be in the past", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+        } catch (ParseException e) {
+            Log.e(TAG, "Error parsing dates for validation", e);
+        }
 
-        // Include priority in description
+        // Remove priority from description
         String fullDescription = "Type: " + (selectedTaskType != null ? selectedTaskType : "Not specified") + 
-                               "\nPriority: " + selectedPriority +
                                "\nStart Date: " + selectedStartDate + 
                                "\n\n" + description;
 

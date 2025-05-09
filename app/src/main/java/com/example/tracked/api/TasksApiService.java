@@ -8,8 +8,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.tasks.Tasks;
@@ -21,9 +23,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public class TasksApiService {
     private static final String TAG = "TasksApiService";
@@ -406,7 +411,7 @@ public class TasksApiService {
     }
 
     /**
-     * Get tasks due on a specific date
+     * Get tasks relevant for a specific date (due on this date or starting on this date)
      * @param date Date in format YYYY-MM-DD
      * @param callback Callback to handle the result
      */
@@ -433,26 +438,76 @@ public class TasksApiService {
                     return;
                 }
                 
-                // Filter tasks due on the specified date
+                // Filter tasks due or starting on the specified date
                 List<Task> tasksForDate = new ArrayList<>();
                 for (Task task : tasks.getItems()) {
-                    if (task.getDue() != null && task.getDue().startsWith(date)) {
+                    // Skip completed tasks
+                    if ("completed".equals(task.getStatus())) {
+                        continue;
+                    }
+                    
+                    boolean isRelevantForToday = false;
+                    
+                    // Check due date
+                    if (task.getDue() != null) {
+                        // Extract just the date part (YYYY-MM-DD) from the due date
+                        String taskDueDate = task.getDue().substring(0, 10);
+                        
+                        if (taskDueDate.equals(date)) {
+                            isRelevantForToday = true;
+                            Log.d(TAG, "Task due today: " + task.getTitle() + ", due: " + taskDueDate);
+                        }
+                    }
+                    
+                    // Check start date from notes
+                    if (!isRelevantForToday && task.getNotes() != null) {
+                        Pattern startDatePattern = Pattern.compile("Start Date:\\s*([^\\n]+)");
+                        Matcher startDateMatcher = startDatePattern.matcher(task.getNotes());
+                        
+                        if (startDateMatcher.find()) {
+                            String startDateStr = startDateMatcher.group(1).trim();
+                            
+                            // Extract just the date part if it's in ISO format
+                            if (startDateStr.length() >= 10) {
+                                String taskStartDate = startDateStr.substring(0, 10);
+                                
+                                if (taskStartDate.equals(date)) {
+                                    isRelevantForToday = true;
+                                    Log.d(TAG, "Task starting today: " + task.getTitle() + ", start: " + taskStartDate);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (isRelevantForToday) {
                         tasksForDate.add(task);
+                    } else {
+                        Log.d(TAG, "Skipping task: " + task.getTitle() + ", not relevant for today: " + date);
                     }
                 }
+                
+                // Log for debugging
+                Log.d(TAG, "Found " + tasksForDate.size() + " tasks relevant for " + date);
                 
                 new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(tasksForDate));
             } catch (UserRecoverableAuthIOException e) {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onAuthorizationRequired(e.getIntent()));
             } catch (IOException e) {
+                Log.e(TAG, "Error getting tasks for date", e);
                 new Handler(Looper.getMainLooper()).post(() -> callback.onFailure(e));
             } catch (Exception e) {
+                Log.e(TAG, "Unexpected error", e);
                 new Handler(Looper.getMainLooper()).post(() -> 
                     callback.onFailure(new Exception("Unexpected error: " + e.getMessage())));
             }
         });
     }
 }
+
+
+
+
+
 
 
 

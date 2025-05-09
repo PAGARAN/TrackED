@@ -74,42 +74,24 @@ public class NewsFragment extends Fragment {
         TextView educationNewsButton = view.findViewById(R.id.educationNewsButton);
         
         schoolNewsButton.setOnClickListener(v -> {
-            showSchoolSelectionDialog();
+            showSchoolSelectionDialog(); // Use our new dialog with university list
         });
         
         educationNewsButton.setOnClickListener(v -> {
             fetchEducationNews();
         });
 
-        // Set up RecyclerView
+        // Initialize handler for auto-scroll (though we won't use it)
+        autoScrollHandler = new Handler();
+
+        // Set up RecyclerView with vertical layout
         LinearLayoutManager newsLayoutManager = new LinearLayoutManager(getContext(),
                 LinearLayoutManager.VERTICAL, false);
         newsRecyclerView.setLayoutManager(newsLayoutManager);
 
-        // Add PagerSnapHelper to snap to full items
-        PagerSnapHelper snapHelper = new PagerSnapHelper();
-        snapHelper.attachToRecyclerView(newsRecyclerView);
-
-        // Initialize adapter
-        newsAdapter = new NewsAdapter(getContext());
+        // Initialize adapter with vertical layout and full width
+        newsAdapter = new NewsAdapter(getContext(), true, true);
         newsRecyclerView.setAdapter(newsAdapter);
-
-        // Initialize auto-scroll handler
-        autoScrollHandler = new Handler();
-        autoScrollRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (newsAdapter.getItemCount() > 0 && isFragmentActive) {
-                    int currentPosition = ((LinearLayoutManager) newsRecyclerView.getLayoutManager())
-                            .findFirstVisibleItemPosition();
-                    int nextPosition = (currentPosition + 1) % newsAdapter.getItemCount();
-                    newsRecyclerView.smoothScrollToPosition(nextPosition);
-                    
-                    // Schedule the next scroll
-                    autoScrollHandler.postDelayed(this, AUTO_SCROLL_DELAY);
-                }
-            }
-        };
 
         // Get NewsApi and RssFeedService from activity
         if (getActivity() instanceof DashboardActivity) {
@@ -117,8 +99,8 @@ public class NewsFragment extends Fragment {
             newsApi = activity.getNewsApi();
             rssFeedService = activity.getRssFeedService();
             
-            // Fetch news
-            fetchEducationNews();
+            // Fetch BukSU news by default
+            fetchBuksuNews();
         }
     }
 
@@ -126,16 +108,19 @@ public class NewsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         isFragmentActive = true;
-        startAutoScroll();
+        // Remove auto-scroll for vertical list
+        // startAutoScroll();
     }
 
     @Override
     public void onPause() {
         super.onPause();
         isFragmentActive = false;
-        stopAutoScroll();
+        // Remove auto-scroll for vertical list
+        // stopAutoScroll();
     }
 
+    // We can keep these methods but we won't call them
     private void startAutoScroll() {
         // Remove any existing callbacks to avoid duplicates
         stopAutoScroll();
@@ -228,11 +213,9 @@ public class NewsFragment extends Fragment {
                     List<NewsArticle> articles = response.body().getArticles();
                     newsAdapter.setNewsArticles(articles);
                     newsRecyclerView.setVisibility(View.VISIBLE);
-                    
-                    // Start auto-scrolling once we have news articles
-                    startAutoScroll();
                 } else {
-                    showNewsError("No BukSU news found");
+                    // If no results from NewsAPI, try RSS feed approach
+                    fetchBuksuRssFeed();
                 }
             }
             
@@ -240,13 +223,86 @@ public class NewsFragment extends Fragment {
             public void onFailure(Call<NewsResponse> call, Throwable t) {
                 if (!isAdded()) return;
                 
-                newsProgress.setVisibility(View.GONE);
-                showNewsError("Network error: " + t.getMessage());
+                // On failure, try RSS feed approach
+                fetchBuksuRssFeed();
+            }
+        });
+    }
+
+    private void fetchBuksuRssFeed() {
+        if (rssFeedService == null || !isAdded()) return;
+        
+        // Try to fetch from Bukidnon State University's own RSS feed
+        String buksuFeedUrl = "https://buksu.edu.ph/feed/";
+        
+        rssFeedService.fetchFeed(buksuFeedUrl, new RssFeedService.RssFeedCallback() {
+            @Override
+            public void onSuccess(List<NewsArticle> newsArticles) {
+                if (!isAdded()) return;
+                
+                getActivity().runOnUiThread(() -> {
+                    newsProgress.setVisibility(View.GONE);
+                    
+                    if (!newsArticles.isEmpty()) {
+                        newsAdapter.setNewsArticles(newsArticles);
+                        newsRecyclerView.setVisibility(View.VISIBLE);
+                    } else {
+                        showNewsError("No BukSU news found");
+                    }
+                });
+            }
+            
+            @Override
+            public void onFailure(Exception e) {
+                if (!isAdded()) return;
+                
+                getActivity().runOnUiThread(() -> {
+                    newsProgress.setVisibility(View.GONE);
+                    showNewsError("Error loading BukSU news: " + e.getMessage());
+                });
             }
         });
     }
 
     private void showSchoolSelectionDialog() {
+        if (!isAdded() || getContext() == null) return;
+        
+        // List of popular schools in the Philippines
+        final String[] popularSchools = new String[] {
+            "Bukidnon State University", // BukSU at the top
+            "University of the Philippines",
+            "Ateneo de Manila University",
+            "De La Salle University",
+            "University of Santo Tomas",
+            "Polytechnic University of the Philippines",
+            "University of San Carlos",
+            "Mindanao State University",
+            "Central Mindanao University",
+            "Xavier University",
+            "Far Eastern University",
+            "Silliman University",
+            "Other (Search)"  // Last option to search for a specific school
+        };
+
+        new MaterialAlertDialogBuilder(getContext())
+            .setTitle("Select School")
+            .setItems(popularSchools, (dialog, which) -> {
+                if (which == popularSchools.length - 1) {
+                    // Last option is "Other (Search)" - show search dialog
+                    showCustomSchoolSearchDialog();
+                } else if (which == 0) {
+                    // First option is "Bukidnon State University" - use specialized method
+                    fetchBuksuNews();
+                } else {
+                    // Fetch news for the selected school
+                    fetchSchoolNews(popularSchools[which]);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void showCustomSchoolSearchDialog() {
         if (!isAdded() || getContext() == null) return;
         
         // Create an EditText for the dialog
@@ -321,6 +377,13 @@ public class NewsFragment extends Fragment {
         });
     }
 }
+
+
+
+
+
+
+
 
 
 

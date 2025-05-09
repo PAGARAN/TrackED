@@ -13,6 +13,7 @@ import android.widget.TextView;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.widget.Toast;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -110,6 +111,9 @@ public class CalendarFragment extends Fragment {
     }
 
     private void loadEventsForDate(Date date) {
+        // Store the selected date for potential refresh
+        lastSelectedDate = date;
+        
         // Show loading indicator
         loadingIndicator.setVisibility(View.VISIBLE);
         noEventsText.setVisibility(View.GONE);
@@ -119,12 +123,18 @@ public class CalendarFragment extends Fragment {
             // Format date for API
             String formattedDate = apiFormat.format(date);
             
+            Log.d(TAG, "Loading events for date: " + formattedDate);
+            
             // Get events for the date
             calendarApiService.getEventsForDate(formattedDate, new CalendarApiService.EventListCallback() {
                 @Override
                 public void onSuccess(List<CalendarEvent> events) {
-                    requireActivity().runOnUiThread(() -> {
+                    if (getActivity() == null) return;
+                    
+                    getActivity().runOnUiThread(() -> {
                         loadingIndicator.setVisibility(View.GONE);
+                        
+                        Log.d(TAG, "Loaded " + events.size() + " events");
                         
                         if (events.isEmpty()) {
                             noEventsText.setText("No tasks scheduled for this day");
@@ -140,11 +150,23 @@ public class CalendarFragment extends Fragment {
                 
                 @Override
                 public void onFailure(Exception e) {
-                    // Handle failure... (code for handling failure)
+                    if (getActivity() == null) return;
+                    
+                    getActivity().runOnUiThread(() -> {
+                        loadingIndicator.setVisibility(View.GONE);
+                        noEventsText.setText("Error loading events: " + e.getMessage());
+                        noEventsText.setVisibility(View.VISIBLE);
+                        eventsRecyclerView.setVisibility(View.GONE);
+                        Log.e(TAG, "Error loading events", e);
+                    });
                 }
             });
         } catch (Exception e) {
-            // Handle exception... (code for handling exception)
+            loadingIndicator.setVisibility(View.GONE);
+            noEventsText.setText("Error loading events: " + e.getMessage());
+            noEventsText.setVisibility(View.VISIBLE);
+            eventsRecyclerView.setVisibility(View.GONE);
+            Log.e(TAG, "Error formatting date", e);
         }
     }
     
@@ -240,8 +262,18 @@ public class CalendarFragment extends Fragment {
             }
         }
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        
+        // Refresh calendar events when fragment becomes visible
+        if (lastSelectedDate != null) {
+            loadEventsForDate(lastSelectedDate);
+        } else {
+            loadEventsForDate(new Date());
+        }
+    }
 }
-
-
 
 
